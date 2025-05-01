@@ -1,0 +1,12 @@
+# Step 1: Prepare the data (2 datasets: Wiki and News)
+-> Execute:
+            scripts/wiki_embeddings.sh
+            scripts/news_embeddings.sh
+Notes: adding the token for login Hugging Face
+
+# Step 2: Train the model (2 datasets: Wiki and News)
+-> Execute:
+            scripts/wiki_train.sh
+            scripts/news_train.sh
+
+Original repo: https://github.com/xinzzzhou/TextFusionHTS
