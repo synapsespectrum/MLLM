@@ -50,6 +50,9 @@ class Model(BasicModel):
         # Fusion
         self.crossatn = CrossAttention(configs.d_model, self.projection_dims[1])
 
+        self.current_epoch = 0
+        self.freeze_epochs = 3  # Số epoch để freeze ts_model
+
     def forward(self, txt_enc, x_enc, x_mark_enc, x_dec, x_mark_dec, x_date, y_date):
         '''
         txt_enc: embedding of text information from freezed LLM: llama2 7b
@@ -77,8 +80,12 @@ class Model(BasicModel):
             # print("dec_out shape: ", dec_out.shape)
         elif self.phase == 'fusion':
             # Giai đoạn 2: Fusion với text
-            with torch.no_grad():  # Freeze ts_model trong giai đoạn 2
+            if self.current_epoch < self.freeze_epochs:
+                with torch.no_grad():  # Freeze ts_model in first few epochs
+                    ts_emb = self.ts_model(x_enc, x_mark_enc, x_dec, x_mark_dec)
+            else:
                 ts_emb = self.ts_model(x_enc, x_mark_enc, x_dec, x_mark_dec)
+
             txt_emb = self.txt_fc(txt_enc)  # [bs x d_txt=4096] -> [bs x projection_dim=768]
             txt_emb = self.projection_mlp(txt_emb)  # [bs x projection_dim]
             txt_emb = txt_emb.reshape(txt_emb.shape[0], 1, txt_emb.shape[1])  # [bs x 1 x projection_dim]

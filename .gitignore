@@ -169,3 +169,21 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# skip files from deep learning frameworks: weights, log, npz, etc.
+*.h5
+*.ckpt
+*.pt
+*.pth
+*.log
+*.npz
+*.pkl
+*.pdf 
+*.json
+*.csv
+*.xml
+*.npy
+log*
+event*
+
+.idea/

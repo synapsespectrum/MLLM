@@ -34,7 +34,7 @@ USE_MULTI_GPU=""  # Leave empty if not using multi-GPU
 DEVICES="0"
 
 # Loop through PRED_LEN values
-for PRED_LEN in 14 21 28 35
+for PRED_LEN in 7 14 21 28 35
 do
   echo "Running experiment with PRED_LEN=$PRED_LEN"
   python main_wiki.py \
