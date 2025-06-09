@@ -9,10 +9,9 @@ class GenPromptEmb(nn.Module):
             data_path='FRED',
             model_name="gpt2",
             device='cuda:0',
-            input_len=96,
+            input_len=24,
             d_model=768,
-            layer=12,
-            divide='train'
+            layer=12
     ):
         super(GenPromptEmb, self).__init__()
         self.data_path = data_path
@@ -37,8 +36,6 @@ class GenPromptEmb(nn.Module):
         total_params = sum(p.numel() for p in self.model.parameters())
         print(f"Total parameters: {total_params:,}")
 
-
-
     def _prepare_prompt(self, input_template, in_data, in_data_mark, i, j):
         # Time series value
         values = in_data[i, :, j].flatten().tolist()
@@ -50,13 +47,14 @@ class GenPromptEmb(nn.Module):
 
         # Date
         if self.data_path in ['Health', 'Environment', 'Energy'
-                              ]: # weekly or daily data
+                              ]:  # weekly or daily data
             start_date = f"{int(in_data_mark[i, 0, 2]):02d}/{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d}"
             end_date = f"{int(in_data_mark[i, self.len, 2]):02d}/{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d}"
-        elif self.data_path in ['Agriculture', 'Climate', 'Economy',  'Security', 'Traffic', 'Social Good']:  # monthly data
+        elif self.data_path in ['Agriculture', 'Climate', 'Economy', 'Security', 'Traffic',
+                                'Social Good']:  # monthly data
             start_date = f"{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d}"  # MM/YYYY
             end_date = f"{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d}"
-        elif self.data_path in ['ETTh1', 'ETTh2', 'ECL']: # hourly data
+        elif self.data_path in ['ETTh1', 'ETTh2', 'ECL']:  # hourly data
             start_date = f"{int(in_data_mark[i, 0, 2]):02d}/{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d} {int(in_data_mark[i, 0, 4]):02d}:00"
             end_date = f"{int(in_data_mark[i, self.len, 2]):02d}/{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d} {int(in_data_mark[i, self.len, 4]):02d}:00"
         else:  # ETTm1, ETTm2, Weather, Farm # 15 minutes or 10 minutes data
@@ -74,7 +72,7 @@ class GenPromptEmb(nn.Module):
 
     def forward(self, tokenized_prompt):
         with torch.no_grad():
-            prompt_embeddings = self.model(tokenized_prompt).last_hidden_state
+            prompt_embeddings = self.model(tokenized_prompt).last_hidden_state  # this idea is from TimeCMA
         return prompt_embeddings
 
     def generate_embeddings(self, in_data, in_data_mark):
@@ -90,7 +88,8 @@ class GenPromptEmb(nn.Module):
             "Social Good": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
         }
 
-        print(f"Using input template for {self.data_path}: {input_templates.get(self.data_path, input_templates['Health'])}")
+        print(
+            f"Using input template for {self.data_path}: {input_templates.get(self.data_path, input_templates['Health'])}")
         input_template = input_templates.get(self.data_path, input_templates['Health'])
 
         tokenized_prompts = []

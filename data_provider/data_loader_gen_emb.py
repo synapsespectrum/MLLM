@@ -6,26 +6,19 @@ from torch.utils.data import Dataset, DataLoader
 from utils.tools import StandardScaler
 from utils.timefeatures import time_features
 import warnings
-import h5py
 
 warnings.filterwarnings('ignore')
 
+
 class Dataset_Custom(Dataset):
-    def __init__(self, root_path="dataset/", flag='train', size=None,
+    def __init__(self, root_path="dataset/", flag='train', seq_len=24,
                  features='S', data_path='Environment',
-                 target='OT', scale=False, timeenc=0, freq='h',patch_len=16,percent=100):
+                 target='OT', scale=False, timeenc=0, freq='h', patch_len=16, percent=100):
         # size [seq_len, label_len, pred_len]
         # info
         self.percent = percent
         self.patch_len = patch_len
-        if size == None:
-            self.seq_len = 24 * 4 * 4
-            self.label_len = 24 * 4
-            self.pred_len = 24 * 4
-        else:
-            self.seq_len = size[0]
-            self.label_len = size[1]
-            self.pred_len = size[2]
+        self.seq_len = seq_len
         # init
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
@@ -35,23 +28,20 @@ class Dataset_Custom(Dataset):
         self.target = target
         self.scale = scale
         self.timeenc = timeenc
-        self.freq = freq
+        self.freq = freq  # 'h' for hourly data, 'd' for daily data, 'w' for weekly data, etc.
 
         self.root_path = root_path
         self.data_path = data_path
 
         if not data_path.endswith('.csv'):
-            data_path_file = data_path
-            data_path += '.csv' 
+            data_path += '.csv'
         self.data_path = data_path
-        self.data_path_file = data_path_file
 
         self.__read_data__()
 
     def __read_data__(self):
         self.scaler = StandardScaler()
-        df_raw = pd.read_csv(os.path.join(self.root_path,
-                                          self.data_path))
+        df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))
 
         '''
         df_raw.columns: ['date', ...(other features), target feature]
@@ -61,7 +51,7 @@ class Dataset_Custom(Dataset):
         cols.remove('date')
         df_raw = df_raw[['date'] + cols + [self.target]]
         # print(cols)
-        num_train = int(len(df_raw) * 0.6)
+        num_train = int(len(df_raw) * 0.7)
         num_test = int(len(df_raw) * 0.2)
         num_vali = len(df_raw) - num_train - num_test
         border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
@@ -106,19 +96,19 @@ class Dataset_Custom(Dataset):
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
-        r_begin = s_end
-        r_end = r_begin + self.pred_len
+        # r_begin = s_end
+        # r_end = r_begin + self.pred_len
 
         seq_x = self.data_x[s_begin:s_end]
-        seq_y = self.data_y[r_begin:r_end]
+        # seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
-        seq_y_mark = self.data_stamp[r_begin:r_end]
+        # seq_y_mark = self.data_stamp[r_begin:r_end]
 
-        auto_y = self.data_x[s_begin+self.patch_len:s_end+self.patch_len]
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+        # auto_y = self.data_x[s_begin + self.patch_len:s_end + self.patch_len]
+        return seq_x, None, seq_x_mark, None
 
     def __len__(self):
-        return len(self.data_x) - self.seq_len - self.pred_len + 1
+        return len(self.data_x) - self.seq_len + 1
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
