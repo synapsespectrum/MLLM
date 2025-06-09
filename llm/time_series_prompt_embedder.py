@@ -88,8 +88,8 @@ class GenPromptEmb(nn.Module):
             "Social Good": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
         }
 
-        print(
-            f"Using input template for {self.data_path}: {input_templates.get(self.data_path, input_templates['Health'])}")
+        # print(
+        #     f"Using input template for {self.data_path}: {input_templates.get(self.data_path, input_templates['Health'])}")
         input_template = input_templates.get(self.data_path, input_templates['Health'])
 
         tokenized_prompts = []

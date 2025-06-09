@@ -17,7 +17,7 @@ echo "Starting embedding generation for dataset $data_path..."
 
 log_file="./Results/emb_logs/${data_path}.log"
 
-python llm/generate_embedding.py \
+python generate_embedding.py \
     --data_path "$data_path" \
     --input_len "$input_len" \
     --target "$target" \
