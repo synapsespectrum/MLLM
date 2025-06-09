@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # Configuration parameters
@@ -7,45 +8,43 @@ llm_model="GPT2"
 batch_size=1
 device="cuda"
 
-# Dataset configurations (data_path:target)
-declare -A datasets=(
-    ["Agriculture"]="OT"
-    ["Climate"]="OT"
-    ["Economy"]="OT"
-    ["Energy"]="OT"
-    ["Environment"]="OT"
-    ["Health"]="OT"
-    ["Security"]="OT"
-    ["SocialGood"]="OT"
-    ["Traffic"]="OT"
-)
+# List of datasets (you can modify this list as needed)
+datasets="Agriculture Climate Economy Energy Environment Health Security SocialGood Traffic"
 
 # Create log directories if they don't exist
 mkdir -p ./Results/emb_logs/
 mkdir -p ./Embeddings_TimeCMA/
 
 echo "Starting embedding generation for all datasets..."
-echo "Found ${#datasets[@]} datasets to process"
+
+# Count total datasets
+dataset_count=0
+for dataset in $datasets; do
+    dataset_count=$((dataset_count + 1))
+done
+
+echo "Found $dataset_count datasets to process"
 
 # Track success/failure
 success_count=0
 error_count=0
-failed_datasets=()
+failed_datasets=""
 
 # Process each dataset
-for data_path in "${!datasets[@]}"; do
-    target="${datasets[$data_path]}"
-
+for data_path in $datasets; do
+    # Default target (you can customize this per dataset if needed)
+    target="OT"
+    
     echo ""
     echo "=================================================="
     echo "Processing dataset: $data_path"
     echo "Target: $target"
     echo "=================================================="
-
+    
     log_file="./Results/emb_logs/${data_path}.log"
-
+    
     # Run the embedding generation
-    python llm/generate_embedding.py \
+    python generate_embedding.py \
         --data_path "$data_path" \
         --input_len "$input_len" \
         --target "$target" \
@@ -55,15 +54,19 @@ for data_path in "${!datasets[@]}"; do
         --device "$device" \
         --emb_saved_path "./Embeddings_TimeCMA" \
         > "$log_file" 2>&1
-
+    
     # Check if successful
     if [ $? -eq 0 ]; then
         echo "✓ SUCCESS: $data_path - Log: $log_file"
-        ((success_count++))
+        success_count=$((success_count + 1))
     else
         echo "✗ ERROR: $data_path - Check log: $log_file"
-        ((error_count++))
-        failed_datasets+=("$data_path")
+        error_count=$((error_count + 1))
+        if [ -z "$failed_datasets" ]; then
+            failed_datasets="$data_path"
+        else
+            failed_datasets="$failed_datasets $data_path"
+        fi
     fi
 done
 
@@ -72,14 +75,14 @@ echo ""
 echo "=================================================="
 echo "PROCESSING SUMMARY"
 echo "=================================================="
-echo "Total datasets: ${#datasets[@]}"
+echo "Total datasets: $dataset_count"
 echo "Successful: $success_count"
 echo "Failed: $error_count"
 
 if [ $error_count -gt 0 ]; then
     echo ""
     echo "Failed datasets:"
-    for dataset in "${failed_datasets[@]}"; do
+    for dataset in $failed_datasets; do
         echo "  - $dataset"
     done
 fi
