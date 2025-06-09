@@ -79,7 +79,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_dataset(data_path, flag, input_len, output_len, target, feature):
+def get_dataset(data_path, flag, input_len, target, feature):
     dataset_class = Dataset_Custom
     return dataset_class(flag=flag,
                          seq_len=input_len,
@@ -91,9 +91,9 @@ def get_dataset(data_path, flag, input_len, output_len, target, feature):
 def save_embeddings(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    train_set = get_dataset(args.data_path, 'train', args.input_len, args.output_len, args.target, args.feature)
-    test_set = get_dataset(args.data_path, 'test', args.input_len, args.output_len, args.target, args.feature)
-    val_set = get_dataset(args.data_path, 'val', args.input_len, args.output_len, args.target, args.feature)
+    train_set = get_dataset(args.data_path, 'train', args.input_len, args.target, args.feature)
+    test_set = get_dataset(args.data_path, 'test', args.input_len, args.target, args.feature)
+    val_set = get_dataset(args.data_path, 'val', args.input_len, args.target, args.feature)
     print(f"Train set length: {len(train_set)}")
     print(f"Test set length: {len(test_set)}")
     print(f"Validation set length: {len(val_set)}")
