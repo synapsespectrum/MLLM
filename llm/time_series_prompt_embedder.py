@@ -23,7 +23,7 @@ class GenPromptEmb(nn.Module):
         self.len = self.input_len - 1
         print(f"Using model: {self.model_name} on device: {self.device}")
 
-        if self.model_name == "gpt2":
+        if self.model_name.lower() == "gpt2":
             self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
             self.model = GPT2Model.from_pretrained(model_name).to(self.device)
         else:

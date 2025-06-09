@@ -1,32 +1,32 @@
 def print_args(args):
     print("\033[1m" + "Basic Config" + "\033[0m")
-    print(f'  {"Task Name:":<20}{args.task_name:<20}{"Is Training:":<20}{args.is_training:<20}')
-    print(f'  {"Model ID:":<20}{args.model_id:<20}{"Model:":<20}{args.model:<20}')
+    # print(f'  {"Task Name:":<20}{args.task_name:<20}{"Is Training:":<20}{args.is_training:<20}')
+    # print(f'  {"Model ID:":<20}{args.model_id:<20}{"Model:":<20}{args.model:<20}')
     print()
 
     print("\033[1m" + "Data Loader" + "\033[0m")
-    print(f'  {"Data:":<20}{args.data:<20}{"Root Path:":<20}{args.root_path:<20}')
+    # print(f'  {"Data:":<20}{args.data:<20}{"Root Path:":<20}{args.root_path:<20}')
     print(f'  {"Data Path:":<20}{args.data_path:<20}{"Features:":<20}{args.features:<20}')
     print(f'  {"Target:":<20}{args.target:<20}{"Freq:":<20}{args.freq:<20}')
     print(f'  {"Checkpoints:":<20}{args.checkpoints:<20}')
     print()
 
-    if args.task_name in ['long_term_forecast', 'short_term_forecast']:
-        print("\033[1m" + "Forecasting Task" + "\033[0m")
-        print(f'  {"Seq Len:":<20}{args.seq_len:<20}{"Label Len:":<20}{args.label_len:<20}')
-        print(f'  {"Pred Len:":<20}{args.pred_len:<20}{"Seasonal Patterns:":<20}{args.seasonal_patterns:<20}')
-        print(f'  {"Inverse:":<20}{args.inverse:<20}')
-        print()
+    # if args.task_name in ['long_term_forecast', 'short_term_forecast']:
+    print("\033[1m" + "Forecasting Task" + "\033[0m")
+    print(f'  {"Seq Len:":<20}{args.seq_len:<20}{"Label Len:":<20}{args.label_len:<20}')
+    # print(f'  {"Pred Len:":<20}{args.pred_len:<20}{"Seasonal Patterns:":<20}{args.seasonal_patterns:<20}')
+    #     print(f'  {"Inverse:":<20}{args.inverse:<20}')
+    #     print()
 
-    if args.task_name == 'imputation':
-        print("\033[1m" + "Imputation Task" + "\033[0m")
-        print(f'  {"Mask Rate:":<20}{args.mask_rate:<20}')
-        print()
-
-    if args.task_name == 'anomaly_detection':
-        print("\033[1m" + "Anomaly Detection Task" + "\033[0m")
-        print(f'  {"Anomaly Ratio:":<20}{args.anomaly_ratio:<20}')
-        print()
+    # if args.task_name == 'imputation':
+    #     print("\033[1m" + "Imputation Task" + "\033[0m")
+    #     print(f'  {"Mask Rate:":<20}{args.mask_rate:<20}')
+    #     print()
+    #
+    # if args.task_name == 'anomaly_detection':
+    #     print("\033[1m" + "Anomaly Detection Task" + "\033[0m")
+    #     print(f'  {"Anomaly Ratio:":<20}{args.anomaly_ratio:<20}')
+    #     print()
 
     print("\033[1m" + "Model Parameters" + "\033[0m")
     print(f'  {"Top k:":<20}{args.top_k:<20}{"Num Kernels:":<20}{args.num_kernels:<20}')

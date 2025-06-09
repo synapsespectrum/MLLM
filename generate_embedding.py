@@ -6,8 +6,7 @@ import argparse
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from utils.print_args import print_args
-from data_provider.data_loader_gen_emb import Dataset_Custom
+from data_provider.embedding_dataloader import Dataset_Custom
 from llm.time_series_prompt_embedder import GenPromptEmb
 
 
@@ -53,9 +52,8 @@ def parse_args():
 
     parser.add_argument("--num_workers", type=int, default=min(10, os.cpu_count()))
 
-    if args.model == "LightTS":
-        if args.pred_len < args.seq_len:
-            args.seq_len = args.pred_len
+    args = parser.parse_args()
+
     if args.llm_model == "BERT" or args.llm_model == "GPT2":
         args.llm_dim = 768
     elif args.llm_model == "LLAMA2" or args.llm_model == "LLAMA3":
@@ -73,10 +71,13 @@ def parse_args():
         args.llm_dim = 768
         args.use_closedllm = 1
 
-    # print all the arguments
-    print_args(args)
+    # print all the arguments in args with formatting
+    print("Arguments: ")
+    for arg, value in vars(args).items():
+        print(f"{arg}: {value}")
+    print("-" * 50)
 
-    return parser.parse_args()
+    return args
 
 
 def get_dataset(data_path, flag, input_len, target, feature):
@@ -116,12 +117,13 @@ def save_embeddings(args):
     ).to(device)
 
     for flag, data_loader in data_loaders.items():
+        print("=" * 50)
         print(f"Processing {flag} set with {len(data_loader)} batches")
         # save_path = f"./Embeddings_TimeCMA/{args.data_path}/{args.divide}/"
-        save_path = f"{args.emb_saved_path}/{args.data_path}/{args.divide}/"
+        save_path = f"{args.emb_saved_path}/{args.data_path}/{flag}/"
         os.makedirs(save_path, exist_ok=True)
 
-        for i, (x, _, x_mark, _) in tqdm(enumerate(data_loader), total=len(data_loader), desc="Generating embeddings"):
+        for i, (x, x_mark) in tqdm(enumerate(data_loader), total=len(data_loader), desc="Generating embeddings"):
             embeddings = gen_prompt_emb.generate_embeddings(x.to(device), x_mark.to(device))
             file_path = f"{save_path}{i}.h5"
             with h5py.File(file_path, 'w') as hf:

@@ -2,8 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
-from utils.tools import StandardScaler
+from torch.utils.data import Dataset
 from utils.timefeatures import time_features
 import warnings
 
@@ -13,7 +12,7 @@ warnings.filterwarnings('ignore')
 class Dataset_Custom(Dataset):
     def __init__(self, root_path="dataset/", flag='train', seq_len=24,
                  features='S', data_path='Environment',
-                 target='OT', scale=False, timeenc=0, freq='h', patch_len=16, percent=100):
+                 target='OT', timeenc=0, freq='h', patch_len=16, percent=100):
         # size [seq_len, label_len, pred_len]
         # info
         self.percent = percent
@@ -26,7 +25,6 @@ class Dataset_Custom(Dataset):
 
         self.features = features
         self.target = target
-        self.scale = scale
         self.timeenc = timeenc
         self.freq = freq  # 'h' for hourly data, 'd' for daily data, 'w' for weekly data, etc.
 
@@ -40,7 +38,6 @@ class Dataset_Custom(Dataset):
         self.__read_data__()
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path))
 
         '''
@@ -66,14 +63,7 @@ class Dataset_Custom(Dataset):
         elif self.features == 'S':
             df_data = df_raw[[self.target]]
 
-        if self.scale:
-            train_data = df_data[border1s[0]:border2s[0]]
-            self.scaler.fit(train_data.values)
-            # print(self.scaler.mean_)
-            # exit()
-            data = self.scaler.transform(df_data.values)
-        else:
-            data = df_data.values
+        data = df_data.values
 
         df_stamp = df_raw[['date']][border1:border2]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
@@ -105,10 +95,8 @@ class Dataset_Custom(Dataset):
         # seq_y_mark = self.data_stamp[r_begin:r_end]
 
         # auto_y = self.data_x[s_begin + self.patch_len:s_end + self.patch_len]
-        return seq_x, None, seq_x_mark, None
+        return seq_x, seq_x_mark
 
     def __len__(self):
         return len(self.data_x) - self.seq_len + 1
 
-    def inverse_transform(self, data):
-        return self.scaler.inverse_transform(data)
