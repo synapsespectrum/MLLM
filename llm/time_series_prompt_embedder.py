@@ -36,7 +36,7 @@ class GenPromptEmb(nn.Module):
         total_params = sum(p.numel() for p in self.model.parameters())
         print(f"Total parameters: {total_params:,}")
 
-    def _prepare_prompt(self, input_template, in_data, in_data_mark, i, j):
+    def _prepare_prompt(self, input_template, in_data, in_data_mark, i, j, in_data_text=None):
         # Time series value
         values = in_data[i, :, j].flatten().tolist()
         values_str = ", ".join([str(int(value)) for value in values])
@@ -61,10 +61,18 @@ class GenPromptEmb(nn.Module):
             start_date = f"{int(in_data_mark[i, 0, 2]):02d}/{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d} {int(in_data_mark[i, 0, 4]):02d}:{int(in_data_mark[i, 0, 5]):02d}"
             end_date = f"{int(in_data_mark[i, self.len, 2]):02d}/{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d} {int(in_data_mark[i, self.len, 4]):02d}:{int(in_data_mark[i, self.len, 5]):02d}"
 
+        # Extract text information
+        text_info = ""
+        if in_data_text is not None and len(in_data_text) > 0:
+            text_info = "Additional information: "
+            if i < len(in_data_text) and len(in_data_text[i]) > 0:
+                text_info += in_data_text[i][j]
+
         # Prompt
         in_prompt = input_template.replace("value1, ..., valuen", values_str)
         in_prompt = in_prompt.replace("Trends", trends_str)
         in_prompt = in_prompt.replace("[t1]", start_date).replace("[t2]", end_date)
+        in_prompt += f" {text_info}"
         # print("in_prompt: ", in_prompt)
 
         tokenized_prompt = self.tokenizer.encode(in_prompt, return_tensors="pt").to(self.device)
@@ -75,17 +83,17 @@ class GenPromptEmb(nn.Module):
             prompt_embeddings = self.model(tokenized_prompt).last_hidden_state  # this idea is from TimeCMA
         return prompt_embeddings
 
-    def generate_embeddings(self, in_data, in_data_mark):
+    def generate_embeddings(self, in_data, in_data_mark, in_data_text=None):
         input_templates = {
-            "Health": "From [t1] to [t2], the values were value1, ..., valuen every week. The total trend value was Trends",
-            "Energy": "From [t1] to [t2], the values were value1, ..., valuen every week. The total trend value was Trends",
-            "Environment": "From [t1] to [t2], the values were value1, ..., valuen every day. The total trend value was Trends",
-            "Agriculture": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
-            "Climate": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
-            "Economy": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
-            "Security": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
-            "Traffic": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
-            "Social Good": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends",
+            "Health": "From [t1] to [t2], the values were value1, ..., valuen every week. The total trend value was Trends.",
+            "Energy": "From [t1] to [t2], the values were value1, ..., valuen every week. The total trend value was Trends.",
+            "Environment": "From [t1] to [t2], the values were value1, ..., valuen every day. The total trend value was Trends.",
+            "Agriculture": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
+            "Climate": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
+            "Economy": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
+            "Security": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
+            "Traffic": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
+            "Social Good": "From [t1] to [t2], the values were value1, ..., valuen every month. The total trend value was Trends.",
         }
 
         # print(
@@ -96,7 +104,7 @@ class GenPromptEmb(nn.Module):
         max_token_count = 0
         for i in range(len(in_data)):
             for j in range(in_data.shape[2]):
-                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j).to(self.device)
+                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(self.device)
                 max_token_count = max(max_token_count, tokenized_prompt.shape[1])
                 tokenized_prompts.append((i, tokenized_prompt.to(self.device), j))
 

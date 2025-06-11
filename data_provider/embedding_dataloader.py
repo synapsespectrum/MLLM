@@ -22,6 +22,7 @@ class Dataset_Custom(Dataset):
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
         self.set_type = type_map[flag]
+        self.text_name = "fact"
 
         self.features = features
         self.target = target
@@ -82,6 +83,9 @@ class Dataset_Custom(Dataset):
         self.data_x = data[border1:border2]
         self.data_y = data[border1:border2]
         self.data_stamp = data_stamp
+        self.text = df_raw[[self.text_name]][border1:border2].values
+        print("data_x shape:", self.data_x.shape)
+        print("text shape:", self.text.shape)
 
     def __getitem__(self, index):
         s_begin = index
@@ -92,11 +96,16 @@ class Dataset_Custom(Dataset):
         seq_x = self.data_x[s_begin:s_end]
         # seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
-        # seq_y_mark = self.data_stamp[r_begin:r_end]
 
-        # auto_y = self.data_x[s_begin + self.patch_len:s_end + self.patch_len]
-        return seq_x, seq_x_mark
+        # Convert text data to a tensor-compatible format
+        seq_text = self.text[s_begin:s_end]
+
+        # Create a list of strings from the numpy array and convert to a list
+        # This approach avoids the need for a string tensor, which PyTorch doesn't support natively
+        seq_text_list = [str(text[0]) for text in seq_text]
+
+        # Return the text as a list, which is compatible with PyTorch's DataLoader
+        return seq_x, seq_x_mark, seq_text_list
 
     def __len__(self):
         return len(self.data_x) - self.seq_len + 1
-

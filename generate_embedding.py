@@ -13,6 +13,14 @@ from llm.time_series_prompt_embedder import GenPromptEmb
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda", help="")
+    parser.add_argument("--num_workers", type=int, default=min(10, os.cpu_count()))
+
+    # Embedding parameters
+    parser.add_argument('--adding_context_info', type=bool, default=True,
+                        help='Whether to add context information to the embeddings')
+    parser.add_argument("--input_len", type=int, default=24)
+    # parser.add_argument("--output_len", type=int, default=12)
+    parser.add_argument("--batch_size", type=int, default=1)
 
     #  LLM parameters
     parser.add_argument('--llm_model', type=str, default='GPT2',
@@ -20,7 +28,6 @@ def parse_args():
     parser.add_argument('--llm_dim', type=int, default='768',
                         help='LLM model dimension')  # LLama7b:4096; GPT2-small:768; BERT-base:768
     parser.add_argument('--llm_layers', type=int, default=12)
-    parser.add_argument('--text_path', type=str, default="None")
     parser.add_argument('--type_tag', type=str, default="#F#")
     parser.add_argument('--text_len', type=int, default=3)
     parser.add_argument('--learning_rate2', type=float, default=1e-2, help='mlp learning rate')
@@ -42,15 +49,8 @@ def parse_args():
     parser.add_argument("--data_path", type=str, default="Environment",
                         help="Dataset name, e.g., 'Farm', 'Health', 'Environment', etc.")
     parser.add_argument("--emb_saved_path", type=str, default="./Embeddings_TimeCMA")
-
-    parser.add_argument("--input_len", type=int, default=24)
-    # parser.add_argument("--output_len", type=int, default=12)
-    parser.add_argument("--batch_size", type=int, default=1)
-
     parser.add_argument("--target", type=str, default="OT", help="Target variable for the dataset")
     parser.add_argument("--feature", type=str, default="M", help="Feature type for the dataset")
-
-    parser.add_argument("--num_workers", type=int, default=min(10, os.cpu_count()))
 
     args = parser.parse_args()
 
@@ -108,7 +108,8 @@ def save_embeddings(args):
     }
 
     gen_prompt_emb = GenPromptEmb(
-        device=device,  # type: ignore
+        # Embedding Time series data into prompts for LLMs
+        device=device,
         input_len=args.input_len,
         data_path=args.data_path,
         model_name=args.llm_model,
@@ -123,8 +124,12 @@ def save_embeddings(args):
         save_path = f"{args.emb_saved_path}/{args.data_path}/{flag}/"
         os.makedirs(save_path, exist_ok=True)
 
-        for i, (x, x_mark) in tqdm(enumerate(data_loader), total=len(data_loader), desc="Generating embeddings"):
-            embeddings = gen_prompt_emb.generate_embeddings(x.to(device), x_mark.to(device))
+        for i, (x, x_mark, seq_text) in tqdm(enumerate(data_loader), total=len(data_loader), desc="Generating embeddings"):
+            # seq_text is a list of strings, so we don't need to move it to the device
+            if args.adding_context_info:
+                embeddings = gen_prompt_emb.generate_embeddings(x.to(device), x_mark.to(device), seq_text)
+            else:
+                embeddings = gen_prompt_emb.generate_embeddings(x.to(device), x_mark.to(device))
             file_path = f"{save_path}{i}.h5"
             with h5py.File(file_path, 'w') as hf:
                 hf.create_dataset('embeddings', data=embeddings.cpu().numpy())
