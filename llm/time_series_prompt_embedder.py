@@ -64,9 +64,10 @@ class GenPromptEmb(nn.Module):
         # Extract text information
         text_info = ""
         if in_data_text is not None and len(in_data_text) > 0:
-            text_info = "Additional information: "
-            if i < len(in_data_text) and len(in_data_text[i]) > 0:
-                text_info += in_data_text[i][j]
+            text_info = "Additional information context: "
+            for txt in in_data_text:
+                if txt is not None and len(txt) > 0:
+                    text_info += txt[0] + "; "
 
         # Prompt
         in_prompt = input_template.replace("value1, ..., valuen", values_str)
