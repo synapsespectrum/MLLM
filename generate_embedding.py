@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--addHisRate', type=float, default=0.5, help='add historical rate')
     parser.add_argument('--init_method', type=str, default='normal', help='init method of combined weight')
     parser.add_argument('--learning_rate_weight', type=float, default=0.0001, help='optimizer learning rate')
-    parser.add_argument('--seed', type=int, default=2024, help='random seed')
+    parser.add_argument('--seed', type=int, default=2021, help='random seed')
     parser.add_argument('--save_name', type=str, default='result_longterm_forecast', help='save name')
     parser.add_argument('--use_fullmodel', type=int, default=0, help='use full model or just encoder')
     parser.add_argument('--use_closedllm', type=int, default=0, help='use closedllm or not')

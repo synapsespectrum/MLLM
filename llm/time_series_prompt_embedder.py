@@ -66,7 +66,7 @@ class GenPromptEmb(nn.Module):
         if in_data_text is not None and len(in_data_text) > 0:
             text_info = "Additional information context: "
             for txt in in_data_text:
-                if txt is not None and len(txt) > 0:
+                if txt is not None and len(txt) > 0 and txt[0] != "nan":
                     text_info += txt[0] + "; "
 
         # Prompt
@@ -103,9 +103,10 @@ class GenPromptEmb(nn.Module):
 
         tokenized_prompts = []
         max_token_count = 0
-        for i in range(len(in_data)):
-            for j in range(in_data.shape[2]):
-                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(self.device)
+        for i in range(len(in_data)):  # iterate over samples
+            for j in range(in_data.shape[2]):  # iterate over features
+                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(
+                    self.device)
                 max_token_count = max(max_token_count, tokenized_prompt.shape[1])
                 tokenized_prompts.append((i, tokenized_prompt.to(self.device), j))
 
