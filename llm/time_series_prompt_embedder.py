@@ -112,6 +112,8 @@ class GenPromptEmb(nn.Module):
 
         in_prompt_emb = torch.zeros((len(in_data), max_token_count, self.d_model, in_data.shape[2]),
                                     dtype=torch.float32, device=self.device)
+        print(f"Max token count for prompts: {max_token_count}")
+        print(f"Total prompts to process: {len(tokenized_prompts)}")
 
         for i, tokenized_prompt, j in tokenized_prompts:
             prompt_embeddings = self.forward(tokenized_prompt)
