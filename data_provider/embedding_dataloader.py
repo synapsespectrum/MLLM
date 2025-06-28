@@ -10,9 +10,15 @@ warnings.filterwarnings('ignore')
 
 
 class Dataset_Custom(Dataset):
+    """
+    Dataset for generating embeddings from txt
+    """
+
     def __init__(self, root_path="dataset/", flag='train', seq_len=24,
                  features='S', data_path='Environment',
-                 target='OT', timeenc=0, freq='h', patch_len=16, percent=100):
+                 target='OT', timeenc=0, freq='h',
+                 patch_len=16, percent=100,
+                 text_name="fact"):
         # size [seq_len, label_len, pred_len]
         # info
         self.percent = percent
@@ -22,7 +28,7 @@ class Dataset_Custom(Dataset):
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
         self.set_type = type_map[flag]
-        self.text_name = "fact"
+        self.text_name = text_name
 
         self.features = features
         self.target = target
@@ -56,8 +62,7 @@ class Dataset_Custom(Dataset):
         border2s = [num_train, num_train + num_vali, len(df_raw)]
         border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
-        if self.set_type == 0:
-            border2 = (border2 - self.seq_len) * self.percent // 100 + self.seq_len
+
         if self.features == 'M' or self.features == 'MS':
             cols_data = df_raw.columns[1:]
             df_data = df_raw[cols_data]
@@ -83,7 +88,12 @@ class Dataset_Custom(Dataset):
         self.data_x = data[border1:border2]
         self.data_y = data[border1:border2]
         self.data_stamp = data_stamp
+        # text processing
         self.text = df_raw[[self.text_name]][border1:border2].values
+        for i in range(len(self.text)):
+            if pd.isnull(self.text[i][0]):
+                self.text[i][0] = 'No information available'
+
         print("data_x shape:", self.data_x.shape)
         print("text shape:", self.text.shape)
 
