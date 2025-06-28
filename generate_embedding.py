@@ -123,12 +123,12 @@ def save_embeddings(args):
             print("=" * 50)
             print(f"Processing {flag} set with {len(data_loader)} batches")
             # save_path = f"./Embeddings_TimeCMA/{args.data_path}/{args.divide}/"
-            save_path = f"{args.emb_saved_path}/text/{args.llm_model}/{args.data_path}/{flag}"
+            save_path = f"{args.emb_saved_path}/text/{args.llm_model}/{args.data_path}/"
             os.makedirs(save_path, exist_ok=True)
 
             data_embedding = gen_prompt_emb(data_loader.dataset.text)
             # save the embeddings to h5 files
-            file_path = f"{save_path}.h5"
+            file_path = f"{save_path}/{flag}.h5"
             with h5py.File(file_path, 'w') as hf:
                 hf.create_dataset('embeddings', data=data_embedding.cpu().numpy())
             print(f"Embeddings saved to {file_path}")
