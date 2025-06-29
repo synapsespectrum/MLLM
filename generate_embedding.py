@@ -62,8 +62,8 @@ def parse_args():
         args.llm_dim = 1024
     elif args.llm_model == "GPT2L":
         args.llm_dim = 1280
-    elif args.llm_model == "GPT2XL":
-        args.llm_dim = 1600
+    elif args.llm_model.upper() == "GPT2XL" or args.llm_model.upper() == "GPT2-LARGE":
+        args.llm_dim = 1280
     elif args.llm_model == "Doc2Vec":
         args.llm_dim = 64
     elif args.llm_model == "ClosedLLM":
