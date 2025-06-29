@@ -23,7 +23,7 @@ class GenPromptEmb(nn.Module):
         self.len = self.input_len - 1
         print(f"Using model: {self.model_name} on device: {self.device}")
 
-        if self.model_name.lower() == "gpt2":
+        if self.model_name.lower() == "gpt2" or self.model_name.lower() == "gpt2-medium" or self.model_name.lower() == "gpt2-large" or self.model_name.lower() == "gpt2-xl":
             self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
             self.model = GPT2Model.from_pretrained(model_name).to(self.device)
         else:
@@ -74,9 +74,11 @@ class GenPromptEmb(nn.Module):
         in_prompt = in_prompt.replace("Trends", trends_str)
         in_prompt = in_prompt.replace("[t1]", start_date).replace("[t2]", end_date)
         in_prompt += f" {text_info}"
-        # print("in_prompt: ", in_prompt)
+        # print(f"{j} -in_prompt: ", len(in_prompt))
+        # print(in_prompt)
+        # print("---")
 
-        tokenized_prompt = self.tokenizer.encode(in_prompt, return_tensors="pt").to(self.device)
+        tokenized_prompt = self.tokenizer.encode(in_prompt, return_tensors="pt", max_length=1024, truncation=True).to(self.device)
         return tokenized_prompt
 
     def forward(self, tokenized_prompt):
