@@ -106,7 +106,7 @@ class Dataset_Custom(Dataset):
             self.scaler.fit(train_data.values)
             data = self.scaler.transform(df_data.values)
             if has_prior:
-                data_prior = self.scaler.transform(df_data_prior.values)
+                data_prior = self.scaler.transform(df_data_prior.values[:,-1].reshape(-1, 1))
         else:
             data = df_data.values
             if has_prior:
