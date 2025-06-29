@@ -53,7 +53,7 @@ for data_path in $datasets; do
         --batch_size "$batch_size" \
         --device "$device" \
         --emb_saved_path "./Embeddings_TimeCMA" \
-        > "$log_file" 2>&1
+        # > "$log_file" 2>&1
     
     # Check if successful
     if [ $? -eq 0 ]; then
