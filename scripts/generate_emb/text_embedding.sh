@@ -11,7 +11,7 @@ device="cuda"
 datasets="Agriculture Climate Economy Energy Environment Health Security SocialGood Traffic"
 
 # Create log directories if they don't exist
-mkdir -p ./Results/emb_logs/
+mkdir -p ./Results/text_emb_logs/${llm_model}/
 mkdir -p ./Embeddings/
 
 echo "Starting embedding generation for all datasets..."
@@ -40,7 +40,7 @@ for data_path in $datasets; do
     echo "Target: $target"
     echo "=================================================="
     
-    log_file="./Results/emb_logs/${data_path}.log"
+    log_file="./Results/text_emb_logs/${llm_model}/${data_path}.log"
     # Run the embedding generation
     python generate_embedding.py \
         --embedding_mode 0 \
@@ -51,7 +51,7 @@ for data_path in $datasets; do
         --batch_size "$batch_size" \
         --device "$device" \
         --emb_saved_path "./Embeddings" \
-        # > "$log_file" 2>&1
+         > "$log_file" 2>&1
     
     # Check if successful
     if [ $? -eq 0 ]; then
