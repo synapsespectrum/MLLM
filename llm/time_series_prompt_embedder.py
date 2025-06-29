@@ -66,7 +66,7 @@ class GenPromptEmb(nn.Module):
         if in_data_text is not None and len(in_data_text) > 0:
             text_info = "Additional information context: "
             for txt in in_data_text:
-                if txt is not None and len(txt) > 0:
+                if txt is not None and len(txt) > 0 and txt[0] != "nan":
                     text_info += txt[0] + "; "
 
         # Prompt
@@ -105,14 +105,17 @@ class GenPromptEmb(nn.Module):
 
         tokenized_prompts = []
         max_token_count = 0
-        for i in range(len(in_data)):
-            for j in range(in_data.shape[2]):
-                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(self.device)
+        for i in range(len(in_data)):  # iterate over samples
+            for j in range(in_data.shape[2]):  # iterate over features
+                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(
+                    self.device)
                 max_token_count = max(max_token_count, tokenized_prompt.shape[1])
                 tokenized_prompts.append((i, tokenized_prompt.to(self.device), j))
 
         in_prompt_emb = torch.zeros((len(in_data), max_token_count, self.d_model, in_data.shape[2]),
                                     dtype=torch.float32, device=self.device)
+        print(f"Max token count for prompts: {max_token_count}")
+        print(f"Total prompts to process: {len(tokenized_prompts)}")
 
         for i, tokenized_prompt, j in tokenized_prompts:
             prompt_embeddings = self.forward(tokenized_prompt)

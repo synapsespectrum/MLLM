@@ -21,7 +21,7 @@ class Dataset_Custom(Dataset):
                  features='S', data_path='Environment',
                  target='OT', scale=True, timeenc=0, freq='h',
                  patch_len=16, percent=100,
-                 text_name="fact", use_embeddings=False, 
+                 text_name="fact", use_embeddings=False,
                  embedding_path="Embeddings/text/", embedding_model="GPT2"):
         # size [seq_len, label_len, pred_len]
         # info
@@ -188,7 +188,7 @@ class Dataset_Custom(Dataset):
 
         s_begins = indices % self.tot_len
         s_ends = s_begins + self.seq_len
-        r_begins = s_ends 
+        r_begins = s_ends
         r_ends = r_begins + self.pred_len
         prior_y = np.array([self.data_prior[r_beg:r_end] for r_beg, r_end in zip(r_begins, r_ends)])
         return prior_y
@@ -200,7 +200,7 @@ class Dataset_Custom(Dataset):
         s_begins = indices % self.tot_len
         s_ends = s_begins + self.seq_len
         prior_y = np.array([self.data_prior[s_beg:s_end] for s_beg, s_end in zip(s_begins, s_ends)])
-        return prior_y    
+        return prior_y
 
     def get_text(self, indices):
         if isinstance(indices, torch.Tensor):
