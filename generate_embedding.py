@@ -134,6 +134,12 @@ def save_embeddings(args):
             print(f"Embeddings saved to {file_path}")
 
     else:
+        if args.embedding_mode == 1:  # Using time series data to generate embeddings
+            print("Using time series data to generate embeddings")
+            folder_saved = f"{args.emb_saved_path}/ts/{args.llm_model}/{args.data_path}/"
+        else:  # Using both text and time series data to generate embeddings
+            print("Using both text and time series data to generate embeddings")
+            folder_saved = f"{args.emb_saved_path}/ts_txt/{args.llm_model}/{args.data_path}/"
         gen_prompt_emb = GenPromptEmb(
             # Embedding Time series data into prompts for LLMs
             device=device,
@@ -147,7 +153,8 @@ def save_embeddings(args):
             print("=" * 50)
             print(f"Processing {flag} set with {len(data_loader)} batches")
             # save_path = f"./Embeddings_TimeCMA/{args.data_path}/{args.divide}/"
-            save_path = f"{args.emb_saved_path}/ts_txt/{args.llm_model}/{args.data_path}/{flag}/"
+            save_path = f"{folder_saved}{args.input_len}/{flag}/"
+            # save_path = f"{args.emb_saved_path}/ts_txt/{args.llm_model}/{args.data_path}/{flag}/"
             os.makedirs(save_path, exist_ok=True)
 
             for i, (x, x_mark, seq_text) in tqdm(enumerate(data_loader),

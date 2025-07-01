@@ -52,6 +52,7 @@ for data_path in $datasets; do
     echo "Target: $target"
     echo "=================================================="
     python generate_embedding.py \
+        --embedding_mode 1 \
         --data_path "$data_path" \
         --input_len "$seq_len" \
         --target "$target" \
