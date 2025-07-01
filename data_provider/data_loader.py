@@ -74,12 +74,19 @@ class Dataset_Custom(Dataset):
         # Check if prior_history_avg column exists
         has_prior = 'prior_history_avg' in df_raw.columns
         has_dates = 'start_date' in df_raw.columns and 'end_date' in df_raw.columns
-
+        if self.text_name in cols:
+            cols.remove(self.text_name)
         if has_prior and has_dates:
+            cols.remove('prior_history_avg')
+            cols.remove('start_date')
+            cols.remove('end_date')
             df_raw = df_raw[['date'] + cols + [self.target] + ['prior_history_avg'] + ['start_date'] + ['end_date']]
         elif has_prior:
+            cols.remove('prior_history_avg')
             df_raw = df_raw[['date'] + cols + [self.target] + ['prior_history_avg']]
         elif has_dates:
+            cols.remove('start_date')
+            cols.remove('end_date')
             df_raw = df_raw[['date'] + cols + [self.target] + ['start_date'] + ['end_date']]
         else:
             df_raw = df_raw[['date'] + cols + [self.target]]

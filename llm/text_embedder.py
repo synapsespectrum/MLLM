@@ -284,7 +284,7 @@ class TextEmbedder(nn.Module):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=256
+            max_length=1024
         )
 
         language_max_len = tokenized_output['input_ids'].shape[1]
