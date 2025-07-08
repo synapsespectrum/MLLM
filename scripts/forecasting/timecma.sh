@@ -37,7 +37,7 @@ dropout_n=0.7
 seed=2025
 
 datasets="Health Climate Economy Energy Environment Agriculture Security SocialGood Traffic"
-embedding_dir="./data/embeddings"
+
 results_dir="./Results"
 
 run_dataset_experiment() {
@@ -53,11 +53,10 @@ run_dataset_experiment() {
     log_path="./Results/${data_path}/"
     mkdir -p $log_path
     log_file="${log_path}i${seq_len}_o${pred_len}_lr${learning_rate}_c${channel}_el${e_layer}_dl${d_layer}_dn${dropout_n}_bs${batch_size}.log"
-    embedding_dir="${embedding_dir}/${data_path}/${seq_len}/"
+    echo "Log file: $log_file"
 
     python train.py \
       --data_path $data_path \
-      --embedding_dir $embedding_dir \
       --batch_size $batch_size \
       --num_nodes 1 \
       --seq_len $seq_len \
@@ -85,22 +84,35 @@ echo ""
 mkdir -p $results_dir
 
 current=0
-total=9
+
+# Calculate total experiments (9 datasets * varying pred_len counts)
+total_experiments=0
+for dataset in $datasets; do
+    freq="${dataset_freq[$dataset]}"
+    pred_len_count=$(echo ${pred_len_map[$freq]} | wc -w)
+    total_experiments=$((total_experiments + pred_len_count))
+done
+
 
 for dataset in $datasets; do
     freq="${dataset_freq[$dataset]}"
     seq_len="${seq_len_map[$freq]}"
-    # Use the first pred_len for each dataset (customize as needed)
-    pred_len=$(echo ${pred_len_map[$freq]} | awk '{print $1}')
+    # Get all pred_len values for this frequency
+    pred_len_values="${pred_len_map[$freq]}"
+
     # Custom batch size for Security
     if [ "$dataset" = "Security" ]; then
         batch_size=16
     else
         batch_size=32
     fi
-    current=$((current+1))
-    echo "Progress: $current/$total"
-    run_dataset_experiment "$dataset" "$seq_len" "$pred_len" "$batch_size"
+
+    # Loop through all pred_len values
+    for pred_len in $pred_len_values; do
+        current=$((current+1))
+        echo "Progress: $current/$total_experiments"
+        run_dataset_experiment "$dataset" "$seq_len" "$pred_len" "$batch_size"
+    done
 done
 
 echo ""
