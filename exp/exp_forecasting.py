@@ -8,18 +8,13 @@ from torch import optim
 import torch.nn.functional as F
 from transformers import LlamaConfig, LlamaModel, LlamaTokenizer, GPT2Config, GPT2Model, GPT2Tokenizer, BertConfig, \
     BertModel, BertTokenizer
-from transformers import AutoConfig, AutoModel, AutoTokenizer, LlamaForCausalLM
-import datetime
-from datetime import datetime, timedelta
+from transformers import AutoTokenizer
 import os
 import time
+import datetime
 import warnings
 import numpy as np
-from utils.dtw_metric import dtw, accelerated_dtw
-from utils.augmentation import run_augmentation, run_augmentation_single
 import pandas as pd
-from datetime import datetime
-import re
 from layers.CrossModal import CrossModal
 
 
@@ -75,279 +70,259 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         mlp_sizes2 = [self.text_embedding_dim + self.args.pred_len, self.args.pred_len]
         if mlp_sizes2 is not None:
             self.mlp_proj = MLP(mlp_sizes2, dropout_rate=0.3)
-        if configs.llm_model == 'Doc2Vec':
-            print('Now using Doc2Vec')
-            print("Training Doc2Vec model")
 
-            from gensim.test.utils import common_texts
-            from gensim.test.utils import common_texts
-            from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-            def read_csv_column(file_path, column_name):
-                df = pd.read_csv(file_path)
-
-                column_data = df[column_name].replace('', np.nan).fillna('null')
-
-                return column_data.to_list()
-
-            result = read_csv_column(file_path=os.path.join(configs.root_path,
-                                                            configs.data_path), column_name='Final_Search_4')
-            train_len = int(len(result) * 0.8)
-            documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(result[:train_len])]
-            text_model = Doc2Vec(documents, vector_size=configs.llm_dim, window=2, min_count=1, workers=4)
-            self.text_model = text_model
-            self.Doc2Vec = True
-        else:
-            if configs.llm_model == 'LLAMA2':
-                # self.llama_config = LlamaConfig.from_pretrained('/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/')
-                self.llama_config = LlamaConfig.from_pretrained('huggyllama/llama-7b')
-                self.llama_config.num_hidden_layers = configs.llm_layers
-                self.llama_config.output_attentions = True
-                self.llama_config.output_hidden_states = True
-                try:
-                    self.llm_model = LlamaModel.from_pretrained(
-                        # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/",
-                        'huggyllama/llama-7b',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.llama_config,
-                        # load_in_4bit=True
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = LlamaModel.from_pretrained(
-                        # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/",
-                        'huggyllama/llama-7b',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.llama_config,
-                        # load_in_4bit=True
-                    )
-                try:
-                    self.tokenizer = LlamaTokenizer.from_pretrained(
-                        # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/tokenizer.model",
-                        'huggyllama/llama-7b',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = LlamaTokenizer.from_pretrained(
-                        # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/tokenizer.model",
-                        'huggyllama/llama-7b',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
-            elif configs.llm_model == 'LLAMA3':
-                # Automatically load the configuration, model, and tokenizer for LLaMA-3-8B
-                llama3_path = "meta-llama/Meta-Llama-3-8B-Instruct"
-                cache_path = "./"
-
-                # Load the configuration with custom adjustments
-                self.config = LlamaConfig.from_pretrained(llama3_path, token=self.hug_token, cache_dir=cache_path)
-
-                self.config.num_hidden_layers = configs.llm_layers
-                self.config.output_attentions = True
-                self.config.output_hidden_states = True
-
+        if configs.llm_model == 'LLAMA2':
+            # self.llama_config = LlamaConfig.from_pretrained('/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/')
+            self.llama_config = LlamaConfig.from_pretrained('huggyllama/llama-7b')
+            self.llama_config.num_hidden_layers = configs.llm_layers
+            self.llama_config.output_attentions = True
+            self.llama_config.output_hidden_states = True
+            try:
                 self.llm_model = LlamaModel.from_pretrained(
-                    llama3_path,
-                    config=self.config,
-                    token=self.hug_token, cache_dir=cache_path
+                    # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/",
+                    'huggyllama/llama-7b',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.llama_config,
+                    # load_in_4bit=True
                 )
-                self.tokenizer = AutoTokenizer.from_pretrained(llama3_path, use_auth_token=self.hug_token,
-                                                               cache_dir=cache_path)
-            elif configs.llm_model == 'GPT2':
-                self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2')
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = LlamaModel.from_pretrained(
+                    # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/",
+                    'huggyllama/llama-7b',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.llama_config,
+                    # load_in_4bit=True
+                )
+            try:
+                self.tokenizer = LlamaTokenizer.from_pretrained(
+                    # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/tokenizer.model",
+                    'huggyllama/llama-7b',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = LlamaTokenizer.from_pretrained(
+                    # "/mnt/alps/modelhub/pretrained_model/LLaMA/7B_hf/tokenizer.model",
+                    'huggyllama/llama-7b',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+        elif configs.llm_model == 'LLAMA3':
+            # Automatically load the configuration, model, and tokenizer for LLaMA-3-8B
+            llama3_path = "meta-llama/Meta-Llama-3-8B-Instruct"
+            cache_path = "./"
 
-                self.gpt2_config.num_hidden_layers = configs.llm_layers
-                self.gpt2_config.output_attentions = True
-                self.gpt2_config.output_hidden_states = True
-                try:
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.gpt2_config,
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.gpt2_config,
-                    )
+            # Load the configuration with custom adjustments
+            self.config = LlamaConfig.from_pretrained(llama3_path, token=self.hug_token, cache_dir=cache_path)
 
-                try:
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
-            elif configs.llm_model == 'GPT2M':
-                self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-medium')
+            self.config.num_hidden_layers = configs.llm_layers
+            self.config.output_attentions = True
+            self.config.output_hidden_states = True
 
-                self.gpt2_config.num_hidden_layers = configs.llm_layers
-                self.gpt2_config.output_attentions = True
-                self.gpt2_config.output_hidden_states = True
-                try:
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-medium',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.gpt2_config,
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-medium',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.gpt2_config,
-                    )
+            self.llm_model = LlamaModel.from_pretrained(
+                llama3_path,
+                config=self.config,
+                token=self.hug_token, cache_dir=cache_path
+            )
+            self.tokenizer = AutoTokenizer.from_pretrained(llama3_path, use_auth_token=self.hug_token,
+                                                           cache_dir=cache_path)
+        elif configs.llm_model == 'GPT2':
+            self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2')
 
-                try:
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-medium',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-medium',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
-            elif configs.llm_model == 'GPT2L':
-                self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-large')
+            self.gpt2_config.num_hidden_layers = configs.llm_layers
+            self.gpt2_config.output_attentions = True
+            self.gpt2_config.output_hidden_states = True
+            try:
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.gpt2_config,
+                )
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.gpt2_config,
+                )
 
-                self.gpt2_config.num_hidden_layers = configs.llm_layers
-                self.gpt2_config.output_attentions = True
-                self.gpt2_config.output_hidden_states = True
-                try:
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-large',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.gpt2_config,
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-large',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.gpt2_config,
-                    )
+            try:
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+        elif configs.llm_model == 'GPT2M':
+            self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-medium')
 
-                try:
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-large',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-large',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
-            elif configs.llm_model == 'GPT2XL':
-                self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-xl')
+            self.gpt2_config.num_hidden_layers = configs.llm_layers
+            self.gpt2_config.output_attentions = True
+            self.gpt2_config.output_hidden_states = True
+            try:
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-medium',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.gpt2_config,
+                )
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-medium',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.gpt2_config,
+                )
 
-                self.gpt2_config.num_hidden_layers = configs.llm_layers
-                self.gpt2_config.output_attentions = True
-                self.gpt2_config.output_hidden_states = True
-                try:
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-xl',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.gpt2_config,
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = GPT2Model.from_pretrained(
-                        'openai-community/gpt2-xl',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.gpt2_config,
-                    )
+            try:
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-medium',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-medium',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+        elif configs.llm_model == 'GPT2L':
+            self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-large')
 
-                try:
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-xl',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = GPT2Tokenizer.from_pretrained(
-                        'openai-community/gpt2-xl',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
-            elif configs.llm_model == 'BERT':
-                self.bert_config = BertConfig.from_pretrained('google-bert/bert-base-uncased')
+            self.gpt2_config.num_hidden_layers = configs.llm_layers
+            self.gpt2_config.output_attentions = True
+            self.gpt2_config.output_hidden_states = True
+            try:
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-large',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.gpt2_config,
+                )
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-large',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.gpt2_config,
+                )
 
-                self.bert_config.num_hidden_layers = configs.llm_layers
-                self.bert_config.output_attentions = True
-                self.bert_config.output_hidden_states = True
-                try:
-                    self.llm_model = BertModel.from_pretrained(
-                        'google-bert/bert-base-uncased',
-                        trust_remote_code=True,
-                        local_files_only=True,
-                        config=self.bert_config,
-                    )
-                except EnvironmentError:  # downloads model from HF is not already done
-                    print("Local model files not found. Attempting to download...")
-                    self.llm_model = BertModel.from_pretrained(
-                        'google-bert/bert-base-uncased',
-                        trust_remote_code=True,
-                        local_files_only=False,
-                        config=self.bert_config,
-                    )
+            try:
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-large',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-large',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+        elif configs.llm_model == 'GPT2XL':
+            self.gpt2_config = GPT2Config.from_pretrained('openai-community/gpt2-xl')
 
-                try:
-                    self.tokenizer = BertTokenizer.from_pretrained(
-                        'google-bert/bert-base-uncased',
-                        trust_remote_code=True,
-                        local_files_only=True
-                    )
-                except EnvironmentError:  # downloads the tokenizer from HF if not already done
-                    print("Local tokenizer files not found. Atempting to download them..")
-                    self.tokenizer = BertTokenizer.from_pretrained(
-                        'google-bert/bert-base-uncased',
-                        trust_remote_code=True,
-                        local_files_only=False
-                    )
+            self.gpt2_config.num_hidden_layers = configs.llm_layers
+            self.gpt2_config.output_attentions = True
+            self.gpt2_config.output_hidden_states = True
+            try:
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-xl',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.gpt2_config,
+                )
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = GPT2Model.from_pretrained(
+                    'openai-community/gpt2-xl',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.gpt2_config,
+                )
 
-            else:
-                raise Exception('LLM model is not defined')
+            try:
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-xl',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = GPT2Tokenizer.from_pretrained(
+                    'openai-community/gpt2-xl',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+        elif configs.llm_model == 'BERT':
+            self.bert_config = BertConfig.from_pretrained('google-bert/bert-base-uncased')
 
-            if self.tokenizer.eos_token:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-            else:
-                pad_token = '[PAD]'
-                self.tokenizer.add_special_tokens({'pad_token': pad_token})
-                self.tokenizer.pad_token = pad_token
+            self.bert_config.num_hidden_layers = configs.llm_layers
+            self.bert_config.output_attentions = True
+            self.bert_config.output_hidden_states = True
+            try:
+                self.llm_model = BertModel.from_pretrained(
+                    'google-bert/bert-base-uncased',
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    config=self.bert_config,
+                )
+            except EnvironmentError:  # downloads model from HF is not already done
+                print("Local model files not found. Attempting to download...")
+                self.llm_model = BertModel.from_pretrained(
+                    'google-bert/bert-base-uncased',
+                    trust_remote_code=True,
+                    local_files_only=False,
+                    config=self.bert_config,
+                )
 
-            for param in self.llm_model.parameters():
-                param.requires_grad = False
-            self.llm_model = self.llm_model.to(self.device)
-            # print the model architecture
-            print("LLM Model Architecture:")
-            print(self.llm_model)  # Assuming the LLM model is stored as 'llm_model' attribute
+            try:
+                self.tokenizer = BertTokenizer.from_pretrained(
+                    'google-bert/bert-base-uncased',
+                    trust_remote_code=True,
+                    local_files_only=True
+                )
+            except EnvironmentError:  # downloads the tokenizer from HF if not already done
+                print("Local tokenizer files not found. Atempting to download them..")
+                self.tokenizer = BertTokenizer.from_pretrained(
+                    'google-bert/bert-base-uncased',
+                    trust_remote_code=True,
+                    local_files_only=False
+                )
+
+        else:
+            raise Exception('LLM model is not defined')
+
+        if self.tokenizer.eos_token:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        else:
+            pad_token = '[PAD]'
+            self.tokenizer.add_special_tokens({'pad_token': pad_token})
+            self.tokenizer.pad_token = pad_token
+
+        for param in self.llm_model.parameters():
+            param.requires_grad = False
+        self.llm_model = self.llm_model.to(self.device)
+        # print the model architecture
+        print("LLM Model Architecture:")
+        print(self.llm_model)  # Assuming the LLM model is stored as 'llm_model' attribute
+
         if args.init_method == 'uniform':
             self.weight1 = nn.Embedding(1, self.args.pred_len)
             self.weight2 = nn.Embedding(1, self.args.pred_len)
@@ -543,14 +518,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         self.cross_attention.train()
         return total_loss
 
-    def train(self, setting):
+    def train(self):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
-
-        path = os.path.join(self.args.checkpoints, setting)
-        if not os.path.exists(path):
-            os.makedirs(path)
 
         time_now = time.time()
 
@@ -595,27 +566,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # batch_text = train_data.get_text(index)
-                #
-                # if self.Doc2Vec == False:
-                #     # prompt = [
-                #     #     f"<|start_prompt|Make predictions about the future based on the following information: {text_info}<|<end_prompt>|>"
-                #     #     for text_info in batch_text]*
-                #     prompt = [ f"{text_info}" for text_info in batch_text]
-                #
-                #     prompt = self.tokenizer(prompt,
-                #                             return_tensors="pt",
-                #                             padding=True, truncation=True,
-                #                             max_length=1024).input_ids
-                #     prompt_embeddings = self.llm_model.get_input_embeddings()(prompt.to(self.device))  # (batch, prompt_token, dim)
-                # else:
-                #     prompt = batch_text
-                #     prompt_embeddings = torch.tensor([self.text_model.infer_vector(text) for text in prompt]).to(
-                #         self.device)
-                # if self.use_fullmodel:
-                #     prompt_emb = self.llm_model(inputs_embeds=prompt_embeddings).last_hidden_state
-                # else:
-                #     prompt_emb = prompt_embeddings
 
                 prompt_emb = train_data.get_text_embeddings(index).float().to(self.device)
 
@@ -637,29 +587,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                # if self.Doc2Vec == False:
-                #     if self.pool_type == "avg":
-                #         global_avg_pool = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_avg_pool.unsqueeze(-1)
-                #     elif self.pool_type == "max":
-                #         global_max_pool = F.adaptive_max_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_max_pool.unsqueeze(-1)
-                #     elif self.pool_type == "min":
-                #         global_min_pool = F.adaptive_max_pool1d(-1.0 * prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_min_pool.unsqueeze(-1)
-                #     elif self.pool_type == "attention":
-                #
-                #         outputs_reshaped = outputs  # .transpose(1, 2)
-                #         outputs_norm = F.normalize(outputs_reshaped, p=2, dim=1)
-                #         prompt_emb_norm = F.normalize(prompt_emb, p=2, dim=2)
-                #         attention_scores = torch.bmm(prompt_emb_norm, outputs_norm)
-                #         attention_weights = F.softmax(attention_scores, dim=1)
-                #
-                #         weighted_prompt_emb = torch.sum(prompt_emb * attention_weights, dim=1)
-                #
-                #         prompt_emb = weighted_prompt_emb.unsqueeze(-1)
-                # else:
-                #     prompt_emb = prompt_emb.unsqueeze(-1)
 
                 # Cross-attention between text embeddings and time series outputs
                 # First project text embeddings to output dimension and reshape
@@ -714,29 +641,27 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
-            early_stopping(vali_loss, self.model, path)
+            early_stopping(vali_loss, self.model, os.path.join(self.args.output_path, self.args.setting))
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
 
             # adjust_learning_rate(model_optim, epoch + 1, self.args)
 
-        best_model_path = path + '/' + 'checkpoint.pth'
-        self.model.load_state_dict(torch.load(best_model_path))
+        best_model_path = self.args.output_path + '/' + self.args.setting + '/' + 'checkpoint.pth'
+        self.model.load_state_dict(torch.load(best_model_path))  # for testing preparation
 
         return self.model
 
-    def test(self, setting, test=0):
+    def test(self, test=0):
         test_data, test_loader = self._get_data(flag='test')
         if test:
             print('loading model')
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            self.model.load_state_dict(torch.load(self.args.checkpoints))
 
         preds = []
         trues = []
-        folder_path = './test_results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        output_test_path = self.args.output_path + self.args.save_name + '/'
 
         self.model.eval()
         self.mlp.eval()
@@ -747,35 +672,12 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-                # 0523
+
                 prior_y = torch.from_numpy(test_data.get_prior_y(index)).float().to(self.device)
-                # input_start_dates,input_end_dates=test_data.get_date(index)
-                # 0523
-                # batch_text = test_data.get_text(index)
-                #
-                # prompt = [
-                #     f"<|start_prompt|Make predictions about the future based on the following information: {text_info}<|<end_prompt>|>"
-                #     for text_info in batch_text]
-                #
+
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
-                # if self.Doc2Vec == False:
-                #     prompt = [
-                #         f"<|start_prompt|Make predictions about the future based on the following information: {text_info}<|<end_prompt>|>"
-                #         for text_info in batch_text]
-                #
-                #     prompt = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True,
-                #                             max_length=1024).input_ids
-                #     prompt_embeddings = self.llm_model.get_input_embeddings()(
-                #         prompt.to(self.device))  # (batch, prompt_token, dim)
-                # else:
-                #     prompt = batch_text
-                #     prompt_embeddings = torch.tensor([self.text_model.infer_vector(text) for text in prompt]).to(
-                #         self.device)
-                # if self.use_fullmodel:
-                #     prompt_emb = self.llm_model(inputs_embeds=prompt_embeddings).last_hidden_state
-                # else:
-                #     prompt_emb = prompt_embeddings
+
                 prompt_emb = test_data.get_text_embeddings(index).float().to(self.device)
                 prompt_emb = self.mlp(prompt_emb)
                 # decoder input
@@ -795,30 +697,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                # if self.Doc2Vec == False:
-                #     if self.pool_type == "avg":
-                #         global_avg_pool = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_avg_pool.unsqueeze(-1)
-                #     elif self.pool_type == "max":
-                #         global_max_pool = F.adaptive_max_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_max_pool.unsqueeze(-1)
-                #     elif self.pool_type == "min":
-                #         global_min_pool = F.adaptive_max_pool1d(-1.0 * prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_min_pool.unsqueeze(-1)
-                #     elif self.pool_type == "attention":
-                #
-                #         outputs_reshaped = outputs  # .transpose(1, 2)
-                #         outputs_norm = F.normalize(outputs_reshaped, p=2, dim=1)
-                #         prompt_emb_norm = F.normalize(prompt_emb, p=2, dim=2)
-                #         attention_scores = torch.bmm(prompt_emb_norm, outputs_norm)
-                #         attention_weights = F.softmax(attention_scores, dim=1)
-                #
-                #         weighted_prompt_emb = torch.sum(prompt_emb * attention_weights, dim=1)
-                #
-                #         prompt_emb = weighted_prompt_emb.unsqueeze(-1)
-                #         # 0523
-                # else:
-                #     prompt_emb = prompt_emb.unsqueeze(-1)
 
                 # Cross-attention between text embeddings and time series outputs
                 # First project text embeddings to output dimension and reshape
@@ -867,7 +745,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                             input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
                         gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                        visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                        visual(gt, pd, os.path.join(output_test_path, str(i) + '.pdf'))
                     except Exception as e:
                         print(f"Visualization skipped due to shape mismatch: {e}")
                         pass
@@ -879,26 +757,25 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         # trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         print('test shape:', preds.shape, trues.shape)
 
-        # result save
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
         # dtw calculation
 
         dtw = -999
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw))
-        f = open(self.args.save_name, 'a')
-        f.write(setting + "  \n")
+        result_path = self.args.output_path + '/' + self.args.save_name
+        # write datetime and metrics to TXT file
+        f = open(result_path, 'a')
+        f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ")
+        f.write(self.args.setting + "  \n")
         f.write('mse:{}, mae:{}, rmse:{}, mape:{}, mspe:{}'.format(mse, mae, rmse, mape, mspe))
         f.write('\n')
         f.write('\n')
         f.close()
+        # store metrics and predictions
 
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path + 'pred.npy', preds)
-        np.save(folder_path + 'true.npy', trues)
+        np.save(output_test_path + 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe])
+        np.save(output_test_path + 'pred.npy', preds)
+        np.save(output_test_path + 'true.npy', trues)
 
         return mse
