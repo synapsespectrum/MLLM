@@ -187,3 +187,6 @@ log*
 event*
 
 .idea/
+
+.env
+*.env
