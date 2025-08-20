@@ -12,6 +12,7 @@ import re
 import os
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='TimesNet')
@@ -35,7 +36,8 @@ if __name__ == '__main__':
     parser.add_argument('--target', type=str, default='OT', help='target feature in S or MS task')
     parser.add_argument('--freq', type=str, default='h',
                         help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
-    parser.add_argument('--checkpoints', type=str, default='./checkpoints/checkpoint.pth', help='location of model checkpoints for testing only')
+    parser.add_argument('--checkpoints', type=str, default='./checkpoints/checkpoint.pth',
+                        help='location of model checkpoints for testing only')
     parser.add_argument('--embedding_path', type=str, default='./Embeddings/',
                         help='location of embedding path, only used for storing embeddings')
 
@@ -134,8 +136,8 @@ if __name__ == '__main__':
     parser.add_argument('--use_closedllm', type=int, default=0, help='use closedllm or not')
     parser.add_argument('--huggingface_token', type=str, help='your token of huggingface;need for llama3')
     args = parser.parse_args()
-    domain = re.search(r'/([^/]+)$', args.root_path).group(1)
-    print("now running on domain {} model {} ".format(domain, args.model))
+    # domain = re.search(r'/([^/]+)$', args.root_path).group(1)
+    # print("now running on domain {} model {} ".format(domain, args.model))
     if args.model == "LightTS":
         if args.pred_len < args.seq_len:
             args.seq_len = args.pred_len
@@ -195,12 +197,25 @@ if __name__ == '__main__':
             args.run_id = ii
             exp = Exp(args)  # set experiments
 
-            print('>>>>>>>start training >>>>>>>>>>>>>>>>>>>>>>>>>>')
-            exp.train()
+            try:
+                print('>>>>>>>start training >>>>>>>>>>>>>>>>>>>>>>>>>>')
+                exp.train()
 
-            print('>>>>>>>testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-            now_mse = exp.test(test=1)
+                print('>>>>>>>testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                now_mse = exp.test(test=1)
+
+                # Log final metrics
+                exp.log_final_metrics(test_mse=now_mse)
+
+            finally:
+                # Đảm bảo đóng tracking connections
+                exp.close_tracking()
+
             torch.cuda.empty_cache()
+
+        print("🎯 All experiments completed!")
+        print(f"📊 View results at: ./logs/{args.experiment_name}/{args.data}/")
+
     else:
         args.run_id = 0
         exp = Exp(args)  # set experiments

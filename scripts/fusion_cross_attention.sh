@@ -60,6 +60,8 @@ do
         data_path=${data_paths[$i]}
         model_id=$(basename ${root_path})
         dataset=$(basename ${data_path} .csv)  # Extract dataset name from data_path
+        # Create a directory for the dataset if it doesn't exist
+        mkdir -p "./logs/${experiment_name}/${dataset}"
         # if SocialGood.csv, use batch size 16
         if [[ "$data_path" == *"SocialGood.csv"* ]]; then
           batch_size=16
@@ -68,7 +70,7 @@ do
         fi
 
         echo "Running model $model_name with root $root_path, data $data_path, pred_len $pred_len, and prompt_weight $prompt_weight"
-        echo "Log saved to ./logs/${experiment_name}/log_${dataset}_${model_name}_gpt2_pw${prompt_weight}.log" # training logs
+        echo "Log saved to ./logs/${experiment_name}/${dataset}/terminal.log" # training logs
         python -u run.py \
         --experiment_name $experiment_name \
         --task_name long_term_forecast \
@@ -76,11 +78,11 @@ do
         --batch_size $batch_size \
         --root_path $root_path \
         --data_path $data_path \
-        --model_id ${model_id}_seed${seed}_input_len${input_len}_pred_len${pred_len}_fullLLM_${use_fullmodel}_pw${prompt_weight} \
+         --model_id $model_id \
         --model $model_name \
         --data $dataset \
-        --features M \
-        --seq_len input_len \
+        --features S \
+        --seq_len $input_len \
         --label_len 12 \
         --pred_len $pred_len \
         --embedding_path $embedding_path \

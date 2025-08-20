@@ -5,6 +5,10 @@ import torch
 import matplotlib.pyplot as plt
 import pandas as pd
 import math
+import mlflow
+from torch.utils.tensorboard import SummaryWriter
+from collections import defaultdict
+import time
 
 plt.switch_backend('agg')
 
@@ -19,12 +23,236 @@ def adjust_learning_rate(optimizer, epoch, args):
             10: 5e-7, 15: 1e-7, 20: 5e-8
         }
     elif args.lradj == "cosine":
-        lr_adjust = {epoch: args.learning_rate /2 * (1 + math.cos(epoch / args.train_epochs * math.pi))}
+        lr_adjust = {epoch: args.learning_rate / 2 * (1 + math.cos(epoch / args.train_epochs * math.pi))}
     if epoch in lr_adjust.keys():
         lr = lr_adjust[epoch]
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         print('Updating learning rate to {}'.format(lr))
+
+
+class MetricsTracker:
+    def __init__(self, writer: SummaryWriter = None, log_iteration_freq=100, tracking_mlflow=False):
+        """
+        Args:
+            writer: TensorBoard SummaryWriter
+            log_iteration_freq: Log iteration metrics mỗi bao nhiêu steps
+        """
+        self.writer = writer
+        self.mlflow_bool = tracking_mlflow
+        self.log_iteration_freq = log_iteration_freq
+
+        # Storage cho metrics
+        self.iteration_metrics = defaultdict(list)
+        self.epoch_metrics = defaultdict(list)
+
+        # Tracking variables
+        self.current_epoch = 0
+        self.global_step = 0
+        self.epoch_start_time = None
+        self.iteration_start_time = None
+
+        # Best metrics tracking
+        self.best_metrics = {}
+
+    def start_epoch(self, epoch):
+        """Bắt đầu epoch mới"""
+        self.current_epoch = epoch
+        self.epoch_start_time = time.time()
+        self.iteration_metrics.clear()  # Reset iteration metrics cho epoch mới
+        print(f"📊 Starting Epoch {epoch + 1}")
+
+    def start_iteration(self):
+        """Bắt đầu iteration mới"""
+        self.iteration_start_time = time.time()
+
+    def log_iteration_metrics(self, metrics_dict, force_log=False):
+        """
+        Log metrics cho iteration hiện tại
+
+        Recommended 'metrics_dict':
+        - train_loss: Loss của batch hiện tại
+        - learning_rate: Learning rate hiện tại
+        - gradient_norm: Gradient norm (optional)
+
+        """
+        self.global_step += 1
+
+        # Lưu metrics vào memory
+        for key, value in metrics_dict.items():
+            self.iteration_metrics[key].append(value)
+
+        # Calculate iteration time nếu có
+        if self.iteration_start_time:
+            iteration_time = time.time() - self.iteration_start_time
+            self.iteration_metrics['iteration_time'].append(iteration_time)
+
+        # Log to TensorBoard và MLflow theo frequency
+        should_log = (self.global_step % self.log_iteration_freq == 0) or force_log
+
+        if should_log:
+            self._log_to_tensorboard_iteration(metrics_dict)
+            self._log_to_mlflow_iteration(metrics_dict)
+
+    def _log_to_tensorboard_iteration(self, metrics_dict):
+        """Log iteration metrics to TensorBoard"""
+        if not self.writer:
+            return
+
+        for key, value in metrics_dict.items():
+            self.writer.add_scalar(f'Iteration/{key}', value, self.global_step)
+
+        # Log system metrics
+        if torch.cuda.is_available():
+            memory_used = torch.cuda.memory_allocated() / 1024 ** 3  # GB
+            memory_cached = torch.cuda.memory_reserved() / 1024 ** 3  # GB
+            self.writer.add_scalar('System/gpu_memory_used_gb', memory_used, self.global_step)
+            self.writer.add_scalar('System/gpu_memory_cached_gb', memory_cached, self.global_step)
+
+    def _log_to_mlflow_iteration(self, metrics_dict):
+        """Log iteration metrics to MLflow"""
+        if not self.mlflow_bool:
+            return
+        for key, value in metrics_dict.items():
+            mlflow.log_metric(f"iter_{key}", value, step=self.global_step)
+
+    def _calculate_epoch_averages(self):
+        """Tính average metrics của epoch từ iteration metrics"""
+        epoch_averages = {}
+
+        for key, values in self.iteration_metrics.items():
+            if values:
+                epoch_averages[f'avg_{key}'] = np.mean(values)
+                epoch_averages[f'std_{key}'] = np.std(values)
+                epoch_averages[f'min_{key}'] = np.min(values)
+                epoch_averages[f'max_{key}'] = np.max(values)
+
+        return epoch_averages
+
+    def _update_best_metrics(self, epoch_metrics):
+        """Update best metrics"""
+        for key, value in epoch_metrics.items():
+            if 'loss' in key.lower():
+                # For loss metrics, lower is better
+                if key not in self.best_metrics or value < self.best_metrics[key]['value']:
+                    self.best_metrics[key] = {'value': value, 'epoch': self.current_epoch}
+            else:
+                # For other metrics, higher might be better (depends on metric)
+                if key not in self.best_metrics or value > self.best_metrics[key]['value']:
+                    self.best_metrics[key] = {'value': value, 'epoch': self.current_epoch}
+
+    def log_epoch_metrics(self, epoch_metrics_dict=None):
+        """
+        Log metrics cho epoch hiện tại
+        Args:
+            epoch_metrics_dict: Dict chứa epoch-level metrics (validation loss, etc.)
+                - train_loss: Average training loss của epoch
+                - validation_loss: Validation loss
+                - test_loss: Test loss
+                - epoch_time: Thời gian training epoch
+
+        """
+        # Tính toán average của iteration metrics trong epoch
+        epoch_averages = self._calculate_epoch_averages()
+
+        # Thêm epoch time
+        if self.epoch_start_time:
+            epoch_time = time.time() - self.epoch_start_time
+            epoch_averages['epoch_time'] = epoch_time
+
+        # Thêm epoch-specific metrics
+        if epoch_metrics_dict:
+            epoch_averages.update(epoch_metrics_dict)
+
+        # Update best metrics
+        self._update_best_metrics(epoch_averages)
+
+        # Store epoch metrics
+        for key, value in epoch_averages.items():
+            self.epoch_metrics[key].append(value)
+
+        # Log to external systems
+        self._log_to_tensorboard_epoch(epoch_averages)
+        self._log_to_mlflow_epoch(epoch_averages)
+
+    def _log_to_tensorboard_epoch(self, epoch_metrics):
+        """Log epoch metrics to TensorBoard"""
+        if not self.writer:
+            return
+
+        for key, value in epoch_metrics.items():
+            self.writer.add_scalar(f'Epoch/{key}', value, self.current_epoch)
+
+        # Special learning curves section
+        if 'train_loss' in epoch_metrics:
+            self.writer.add_scalar('Learning_Curves/Train_Loss',
+                                   epoch_metrics['train_loss'], self.current_epoch)
+        if 'validation_loss' in epoch_metrics:
+            self.writer.add_scalar('Learning_Curves/Validation_Loss',
+                                   epoch_metrics['validation_loss'], self.current_epoch)
+        if 'test_loss' in epoch_metrics:
+            self.writer.add_scalar('Learning_Curves/Test_Loss',
+                                   epoch_metrics['test_loss'], self.current_epoch)
+
+    def _log_to_mlflow_epoch(self, epoch_metrics):
+        """Log epoch metrics to MLflow"""
+        if not self.mlflow_bool:
+            return
+        for key, value in epoch_metrics.items():
+            mlflow.log_metric(f"epoch_{key}", value, step=self.current_epoch)
+
+    def _print_epoch_summary(self, epoch_metrics):
+        """In summary của epoch"""
+        print(f"📈 Epoch {self.current_epoch + 1} Summary:")
+
+        # Key metrics
+        key_metrics = ['train_loss', 'validation_loss', 'test_loss', 'epoch_time']
+        for metric in key_metrics:
+            if metric in epoch_metrics:
+                if 'time' in metric:
+                    print(f"   {metric}: {epoch_metrics[metric]:.2f}s")
+                else:
+                    print(f"   {metric}: {epoch_metrics[metric]:.6f}")
+
+        # Memory usage
+        if torch.cuda.is_available():
+            memory_used = torch.cuda.memory_allocated() / 1024 ** 3
+            print(f"   GPU Memory: {memory_used:.2f}GB")
+
+        print("-" * 50)
+
+    def log_gradient_norms(self, model):
+        """Log gradient norms"""
+        total_norm = 0
+        for p in model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** (1. / 2)
+
+        if self.writer:
+            self.writer.add_scalar('Gradients/total_norm', total_norm, self.global_step)
+
+        return total_norm
+
+    def get_epoch_summary(self):
+        """Trả về summary của epoch hiện tại"""
+        summary = {}
+        for key, values in self.iteration_metrics.items():
+            if values:
+                summary[f'avg_{key}'] = np.mean(values)
+                summary[f'min_{key}'] = np.min(values)
+                summary[f'max_{key}'] = np.max(values)
+        return summary
+
+    def get_best_metrics_summary(self):
+        """Trả về summary của best metrics"""
+        print("\n🏆 Best Metrics Summary:")
+        for metric, info in self.best_metrics.items():
+            print(f"   {metric}: {info['value']:.6f} (Epoch {info['epoch'] + 1})")
+        print("-" * 50)
+
+        return self.best_metrics
 
 
 class EarlyStopping:

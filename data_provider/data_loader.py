@@ -162,7 +162,7 @@ class Dataset_Custom(Dataset):
         """Load pre-embedded text data from h5 files"""
         embedding_dir = os.path.join(self.embedding_path, self.embedding_model, self.data_path.replace('.csv', ''), self.flag)
 
-        if os.path.exists(embedding_dir):
+        try:
             print(f"Loading embeddings from {embedding_dir}")
 
             # Check if embeddings are stored in a single file or multiple files
@@ -188,6 +188,11 @@ class Dataset_Custom(Dataset):
                 # Concatenate all embeddings
                 self.text_embeddings = torch.tensor(np.concatenate(embeddings_list, axis=0))
                 print(f"Loaded embeddings with shape: {self.text_embeddings.shape}")
+        except FileNotFoundError:
+            # If the embedding directory does not exist, raise an error
+            print(f"Embedding directory {embedding_dir} does not exist. Please check the path or generate embeddings first.")
+            raise FileNotFoundError(f"Embedding directory {embedding_dir} does not exist.")
+
 
     def get_prior_y(self, indices):
         if isinstance(indices, torch.Tensor):

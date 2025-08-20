@@ -2,7 +2,7 @@ from data_provider.data_loader import Dataset_Custom
 from torch.utils.data import DataLoader
 
 
-def data_provider(args, flag, llm_model, tokenizer):
+def data_provider(args, flag):
     Data = Dataset_Custom
     timeenc = 0 if args.embed != 'timeF' else 1
 
