@@ -75,6 +75,7 @@ do
         --experiment_name $experiment_name \
         --task_name long_term_forecast \
         --is_training 1 \
+        --tracking_mlflow 1 \
         --batch_size $batch_size \
         --root_path $root_path \
         --data_path $data_path \
@@ -83,7 +84,7 @@ do
         --data $dataset \
         --features S \
         --seq_len $input_len \
-        --label_len 12 \
+        --label_len 0 \
         --pred_len $pred_len \
         --embedding_path $embedding_path \
         --des 'Exp' \
