@@ -194,12 +194,31 @@ class MetricsTracker:
             self.writer.add_scalar('Learning_Curves/Test_Loss',
                                    epoch_metrics['test_loss'], self.current_epoch)
 
+        # 🔥 COMBINED LOSS CHART for TensorBoard - same chart with different series
+        losses = {}
+        if 'train_loss' in epoch_metrics:
+            losses['Train'] = epoch_metrics['train_loss']
+        if 'validation_loss' in epoch_metrics:
+            losses['Validation'] = epoch_metrics['validation_loss']
+        if 'test_loss' in epoch_metrics:
+            losses['Test'] = epoch_metrics['test_loss']
+
+        if losses:
+            self.writer.add_scalars('Losses', losses, self.current_epoch)
+
     def _log_to_mlflow_epoch(self, epoch_metrics):
         """Log epoch metrics to MLflow"""
         if not self.mlflow_bool:
             return
         for key, value in epoch_metrics.items():
             mlflow.log_metric(f"epoch_{key}", value, step=self.current_epoch)
+        # 🔥 COMBINED LOSS CHART: Log with same prefix for grouping
+        if 'train_loss' in epoch_metrics:
+            mlflow.log_metric("loss/train", epoch_metrics['train_loss'], step=self.current_epoch)
+        if 'validation_loss' in epoch_metrics:
+            mlflow.log_metric("loss/validation", epoch_metrics['validation_loss'], step=self.current_epoch)
+        if 'test_loss' in epoch_metrics:
+            mlflow.log_metric("loss/test", epoch_metrics['test_loss'], step=self.current_epoch)
 
     def _print_epoch_summary(self, epoch_metrics):
         """In summary của epoch"""

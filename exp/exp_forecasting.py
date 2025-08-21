@@ -14,8 +14,7 @@ import time
 import datetime
 import warnings
 import numpy as np
-import pandas as pd
-from layers.CrossModal import CrossModal
+from model import TSLLMFusionModel
 
 
 def norm(input_emb):
@@ -340,23 +339,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         else:
             raise ValueError('Unsupported initialization method')
 
-        # self.tokenizer=self.tokenizer.to(self.device)
-        self.mlp = self.mlp.to(self.device)
-        self.mlp_proj = self.mlp_proj.to(self.device)
-
-        # Initialize cross-attention module
-        # Use the model's output dimension (c_out) as d_model for cross-attention
-        self.cross_attention = CrossModal(
-            d_model=self.args.c_out,
-            n_heads=1,
-            d_ff=self.args.c_out * 4,
-            norm='LayerNorm',
-            attn_dropout=0.1,
-            dropout=0.1,
-            pre_norm=True,
-            activation="gelu",
-            n_layers=2
-        ).to(self.device)
+        # Build the main model
+        self.model = TSLLMFusionModel(configs=self.args).to(self.device)
+        print("Model Architecture:")
+        print(self.model)
 
         # Add a projection layer to map text embeddings to output dimension
         self.text_to_output_proj = nn.Linear(self.text_embedding_dim, self.args.c_out).to(self.device)
@@ -393,7 +379,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return model_optim
 
     def _select_optimizer_cross(self):
-        model_optim = optim.Adam(self.cross_attention.parameters(), lr=self.args.learning_rate2)
+        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate2)
         return model_optim
 
     def _select_optimizer_text_proj(self):
@@ -407,9 +393,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     def vali(self, vali_data, vali_loader, criterion):
         total_loss = []
         self.model.eval()
-        self.mlp.eval()
-        self.mlp_proj.eval()
-        self.cross_attention.eval()
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(vali_loader):
                 batch_x = batch_x.float().to(self.device)
@@ -418,92 +401,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
                 prior_y = torch.from_numpy(vali_data.get_prior_y(index)).float().to(self.device)
 
-                # batch_text = vali_data.get_text(index)
-                #
-                # if self.Doc2Vec == False:
-                #     prompt = [
-                #         f"<|start_prompt|Make predictions about the future based on the following information: {text_info}<|<end_prompt>|>"
-                #         for text_info in batch_text]
-                #
-                #     prompt = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True,
-                #                             max_length=1024).input_ids
-                #     prompt_embeddings = self.llm_model.get_input_embeddings()(
-                #         prompt.to(self.device))  # (batch, prompt_token, dim)
-                # else:
-                #     prompt = batch_text
-                #     prompt_embeddings = torch.tensor([self.text_model.infer_vector(text) for text in prompt]).to(
-                #         self.device)
-                # if self.use_fullmodel:
-                #     prompt_emb = self.llm_model(inputs_embeds=prompt_embeddings).last_hidden_state
-                # else:
-                #     prompt_emb = prompt_embeddings
-
                 prompt_emb = vali_data.get_text_embeddings(index).float().to(self.device)
-
-                prompt_emb = self.mlp(prompt_emb)  # (batch, prompt_token, text_embedding_dim)
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                    else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                # if self.Doc2Vec == False:
-                #     if self.pool_type == "avg":
-                #         global_avg_pool = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_avg_pool.unsqueeze(-1)
-                #     elif self.pool_type == "max":
-                #         global_max_pool = F.adaptive_max_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_max_pool.unsqueeze(-1)
-                #     elif self.pool_type == "min":
-                #         global_min_pool = F.adaptive_max_pool1d(-1.0 * prompt_emb.transpose(1, 2), 1).squeeze(2)
-                #         prompt_emb = global_min_pool.unsqueeze(-1)
-                #     elif self.pool_type == "attention":
-                #
-                #         outputs_reshaped = outputs
-                #         attention_scores = torch.bmm(prompt_emb, outputs_reshaped)
-                #         attention_weights = F.softmax(attention_scores, dim=1)
-                #
-                #         weighted_prompt_emb = torch.sum(prompt_emb * attention_weights, dim=1)
-                #
-                #         prompt_emb = weighted_prompt_emb.unsqueeze(-1)
-                #
-                # else:
-                #     prompt_emb = prompt_emb.unsqueeze(-1)
-
-                # Cross-attention between text embeddings and time series outputs
-                # First project text embeddings to output dimension and reshape
-                if prompt_emb.dim() == 3 and prompt_emb.size(-1) == 1:
-                    # Remove the last dimension if it's 1
-                    prompt_emb_for_proj = prompt_emb.squeeze(-1)  # (batch, text_embedding_dim)
-                else:
-                    # If prompt_emb has multiple tokens, average pool them first
-                    prompt_emb_for_proj = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(
-                        2)  # (batch, text_embedding_dim)
-
-                # Project to output dimension
-                prompt_emb_projected = self.text_to_output_proj(prompt_emb_for_proj)  # (batch, c_out)
-                prompt_emb_for_cross = prompt_emb_projected.unsqueeze(1).repeat(1, self.args.pred_len,
-                                                                                1)  # (batch, pred_len, c_out)
-
-                # Apply cross-attention: text as query, time series as key/value
-                cross_out = self.cross_attention(prompt_emb_for_cross, outputs, outputs)  # (batch, pred_len, c_out)
-
-                # Combine with prior information and normalize
-                prompt_y = norm(cross_out.transpose(1, 2)) + prior_y
-                outputs = (1 - self.prompt_weight) * outputs + self.prompt_weight * prompt_y
-
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                outputs, _ = self.model(batch_x, batch_x_mark,
+                                        prompt_emb,
+                                        dec_inp, batch_y_mark)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
@@ -513,9 +417,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 total_loss.append(loss)
         total_loss = np.average(total_loss)
         self.model.train()
-        self.mlp.train()
-        self.mlp_proj.train()
-        self.cross_attention.train()
         return total_loss
 
     def train(self):
@@ -529,10 +430,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
 
         model_optim = self._select_optimizer()
-        model_optim_mlp = self._select_optimizer_mlp()
-        model_optim_proj = self._select_optimizer_proj()
-        model_optim_cross = self._select_optimizer_cross()
-        model_optim_text_proj = self._select_optimizer_text_proj()
         criterion = self._select_criterion()
 
         if self.args.use_amp:
@@ -546,18 +443,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             train_loss = []
 
             self.model.train()
-            self.mlp.train()
-            self.mlp_proj.train()
-            self.cross_attention.train()
-            self.text_to_output_proj.train()
             epoch_time = time.time()
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(train_loader):
                 iter_count += 1
                 model_optim.zero_grad()
-                model_optim_mlp.zero_grad()
-                model_optim_proj.zero_grad()
-                model_optim_cross.zero_grad()
-                model_optim_text_proj.zero_grad()
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
                 # 0523
@@ -572,48 +461,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 prompt_emb = train_data.get_text_embeddings(index).float().to(self.device)
 
-                prompt_emb = self.mlp(prompt_emb)
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                    else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
 
-                # Cross-attention between text embeddings and time series outputs
-                # First project text embeddings to output dimension and reshape
-                if prompt_emb.dim() == 3 and prompt_emb.size(-1) == 1:
-                    # Remove the last dimension if it's 1
-                    prompt_emb_for_proj = prompt_emb.squeeze(-1)  # (batch, text_embedding_dim)
-                else:
-                    # If prompt_emb has multiple tokens, average pool them first
-                    prompt_emb_for_proj = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(
-                        2)  # (batch, text_embedding_dim)
+                # TS-LLM Fusion Model Forward Pass
+                outputs, _ = self.model(batch_x, batch_x_mark,
+                                        prompt_emb,
+                                        dec_inp, batch_y_mark)
 
-                # Project to output dimension
-                prompt_emb_projected = self.text_to_output_proj(prompt_emb_for_proj)  # (batch, c_out)
-                prompt_emb_for_cross = prompt_emb_projected.unsqueeze(1).repeat(1, self.args.pred_len,
-                                                                                1)  # (batch, pred_len, c_out)
-
-                # Apply cross-attention: text as query, time series as key/value
-                cross_out = self.cross_attention(prompt_emb_for_cross, outputs, outputs)  # (batch, pred_len, c_out)
-
-                # Combine with prior information and normalize
-                prompt_y = norm(cross_out.transpose(1, 2)) + prior_y
-                outputs = (1 - self.prompt_weight) * outputs + self.prompt_weight * prompt_y
-
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
                 loss = criterion(outputs, batch_y)
                 train_loss.append(loss.item())
 
@@ -632,10 +488,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 else:
                     loss.backward()
                     model_optim.step()
-                    model_optim_mlp.step()
-                    model_optim_proj.step()
-                    model_optim_cross.step()
-                    model_optim_text_proj.step()
 
                 # Log iteration metrics
                 self.metrics_tracker.log_iteration_metrics({
@@ -676,13 +528,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
-        output_test_path = self.args.output_path + self.args.save_name + '/'
+        output_test_path = self.args.output_path + '/' + self.args.save_name + '/'
 
         self.model.eval()
-        self.mlp.eval()
-        self.mlp_proj.eval()
-        self.cross_attention.eval()
-        self.text_to_output_proj.eval()
+        # self.mlp.eval()
+        # self.mlp_proj.eval()
+        # self.cross_attention.eval()
+        # self.text_to_output_proj.eval()
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device)
@@ -694,61 +546,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 prompt_emb = test_data.get_text_embeddings(index).float().to(self.device)
-                prompt_emb = self.mlp(prompt_emb)
+                # prompt_emb = self.mlp(prompt_emb)
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                # encoder - decoder
-                if self.args.use_amp:
-                    with torch.cuda.amp.autocast():
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                    else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                outputs, _ = self.model(batch_x, batch_x_mark,
+                                        prompt_emb,
+                                        dec_inp, batch_y_mark)
 
-                # Cross-attention between text embeddings and time series outputs
-                # First project text embeddings to output dimension and reshape
-                if prompt_emb.dim() == 3 and prompt_emb.size(-1) == 1:
-                    # Remove the last dimension if it's 1
-                    prompt_emb_for_proj = prompt_emb.squeeze(-1)  # (batch, text_embedding_dim)
-                else:
-                    # If prompt_emb has multiple tokens, average pool them first
-                    prompt_emb_for_proj = F.adaptive_avg_pool1d(prompt_emb.transpose(1, 2), 1).squeeze(
-                        2)  # (batch, text_embedding_dim)
-
-                # Project to output dimension
-                prompt_emb_projected = self.text_to_output_proj(prompt_emb_for_proj)  # (batch, c_out)
-                prompt_emb_for_cross = prompt_emb_projected.unsqueeze(1).repeat(1, self.args.pred_len,
-                                                                                1)  # (batch, pred_len, c_out)
-
-                # Apply cross-attention: text as query, time series as key/value
-                cross_out = self.cross_attention(prompt_emb_for_cross, outputs, outputs)  # (batch, pred_len, c_out)
-
-                # Combine with prior information and normalize
-                prompt_y = norm(cross_out.transpose(1, 2)) + prior_y
-                outputs = (1 - self.prompt_weight) * outputs + self.prompt_weight * prompt_y
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, :]
-                batch_y = batch_y[:, -self.args.pred_len:, :].to(self.device)
-                outputs = outputs.detach().cpu().numpy()
-                batch_y = batch_y.detach().cpu().numpy()
-                if test_data.scale and self.args.inverse:
-                    shape = outputs.shape
-                    outputs = test_data.inverse_transform(outputs.squeeze(0)).reshape(shape)
-                    batch_y = test_data.inverse_transform(batch_y.squeeze(0)).reshape(shape)
-
-                outputs = outputs[:, :, f_dim:]
-                batch_y = batch_y[:, :, f_dim:]
-
-                pred = outputs
-                true = batch_y
+                pred = outputs.detach().cpu()
+                true = batch_y.detach().cpu()
 
                 preds.append(pred)
                 trues.append(true)
@@ -760,7 +567,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                             input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
                         gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                        visual(gt, pd, os.path.join(output_test_path, str(i) + '.pdf'))
+                        visual(gt, pd, os.path.join(self.args.log_path, str(i) + '.pdf'))
                     except Exception as e:
                         print(f"Visualization skipped due to shape mismatch: {e}")
                         pass
@@ -789,8 +596,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         f.close()
         # store metrics and predictions
 
-        np.save(output_test_path + 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe])
-        np.save(output_test_path + 'pred.npy', preds)
-        np.save(output_test_path + 'true.npy', trues)
+        np.save(os.path.join(self.args.log_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe]))
+        np.save(os.path.join(self.args.log_path, 'pred.npy'), preds)
+        np.save(os.path.join(self.args.log_path, 'true.npy'), trues)
 
         return mse

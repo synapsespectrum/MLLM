@@ -1,6 +1,5 @@
 import os
 import torch
-from ts import PatchTST, iTransformer
 
 # Import tracking libraries
 import mlflow
@@ -12,33 +11,7 @@ from utils.tools import MetricsTracker
 class Exp_Basic(object):
     def __init__(self, args):
         self.args = args
-        self.model_dict = {
-            # 'TimesNet': TimesNet,
-            # 'Autoformer': Autoformer,
-            # 'Transformer': Transformer,
-            # 'Nonstationary_Transformer': Nonstationary_Transformer,
-            # 'DLinear': DLinear,
-            # 'FEDformer': FEDformer,
-            # 'Informer': Informer,
-            # 'LightTS': LightTS,
-            # 'Reformer': Reformer,
-            # 'ETSformer': ETSformer,
-            'PatchTST': PatchTST,
-            # 'Pyraformer': Pyraformer,
-            # 'MICN': MICN,
-            # 'Crossformer': Crossformer,
-            # 'FiLM': FiLM,
-            'iTransformer': iTransformer,
-            # 'Koopa': Koopa,
-            # 'TiDE': TiDE,
-            # 'FreTS': FreTS,
-            # 'TimeMixer': TimeMixer,
-            # 'TSMixer': TSMixer,
-            # 'SegRNN': SegRNN
-        }
         self.device = self._acquire_device()
-        self.model = self._build_model().to(self.device)
-        self.args = args
         self.__setup_logging()
         self.__setup_tracking()
 
@@ -69,11 +42,12 @@ class Exp_Basic(object):
             self.args.distil,
             self.args.des, self.args.run_id)
 
-        # import platform
-        # if platform.system() == 'Windows' and len(setting) > 100:
-        #     from datetime import datetime
-        #     setting = f"{self.args.model}_pl{self.args.pred_len}_{datetime}" \
-        #     print(f"⚠️  Setting name shortened for Windows compatibility")
+        import platform
+        if platform.system() == 'Windows' and len(setting) > 100:
+            from datetime import datetime
+            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            setting = f"{self.args.model}_pl{self.args.pred_len}_{now}"
+            print(f"⚠️  Setting name shortened for Windows compatibility")
 
         self.args.setting = setting
         # ./logs/experiment_name/dataset_name
@@ -120,10 +94,11 @@ class Exp_Basic(object):
         print(f"🏃 MLflow run: {run_name}")
 
         # Setup MetricsTracker
-        log_iteration_freq = getattr(self.args, 'log_iteration_freq', 100)  # Default 100
+        log_iteration_freq = getattr(self.args, 'log_iteration_freq', 10)  # Default 100
         self.metrics_tracker = MetricsTracker(
             writer=self.writer,
-            log_iteration_freq=log_iteration_freq
+            log_iteration_freq=log_iteration_freq,
+            tracking_mlflow=self.args.tracking_mlflow
         )
 
         # Log experiment parameters

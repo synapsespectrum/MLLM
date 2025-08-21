@@ -1,13 +1,9 @@
 import argparse
-import os
 import torch
 from exp.exp_forecasting import Exp_Long_Term_Forecast
 from utils.print_args import print_args
 import random
 import numpy as np
-import numpy as np
-import pandas as pd
-import re
 
 import os
 
@@ -26,6 +22,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_id', type=str, required=True, default='test', help='model id')
     parser.add_argument('--model', type=str, required=True, default='Autoformer',
                         help='model name, options: [Autoformer, Transformer, TimesNet]')
+    parser.add_argument('--tracking_mlflow', type=int, default=0,
+                        help='whether to use mlflow for tracking experiments, 0: no tracking, 1: tracking')
 
     # data loader
     parser.add_argument('--data', type=str, required=True, default='Agriculture', help='dataset type')
@@ -43,7 +41,7 @@ if __name__ == '__main__':
 
     # forecasting task
     parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
-    parser.add_argument('--label_len', type=int, default=48, help='start token length')
+    parser.add_argument('--label_len', type=int, default=0, help='start token length')
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
     parser.add_argument('--seasonal_patterns', type=str, default='Monthly', help='subset for M4')
     parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
@@ -63,6 +61,9 @@ if __name__ == '__main__':
     parser.add_argument('--dec_in', type=int, default=7, help='decoder input size')
     parser.add_argument('--c_out', type=int, default=7, help='output size')
     parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
+    parser.add_argument('--fusion_dim', type=int, default=256,
+                        help='dimension of fusion cross attention, should be the same as d_model')
+    parser.add_argument('--fusion_heads', type=int, default=4, help='num of heads in fused cross attention')
     parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
     parser.add_argument('--e_layers', type=int, default=2, help='num of encoder layers')
     parser.add_argument('--d_layers', type=int, default=1, help='num of decoder layers')
@@ -186,10 +187,7 @@ if __name__ == '__main__':
     print('Args in experiment:')
     print_args(args)
 
-    if args.task_name == 'long_term_forecast':
-        Exp = Exp_Long_Term_Forecast
-    else:
-        Exp = Exp_Long_Term_Forecast
+    Exp = Exp_Long_Term_Forecast
 
     if args.is_training:
         for ii in range(args.itr):
@@ -202,7 +200,7 @@ if __name__ == '__main__':
                 exp.train()
 
                 print('>>>>>>>testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-                now_mse = exp.test(test=1)
+                now_mse = exp.test()
 
                 # Log final metrics
                 exp.log_final_metrics(test_mse=now_mse)
