@@ -579,12 +579,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         # trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         print('test shape:', preds.shape, trues.shape)
 
-        # dtw calculation
-
-        dtw = -999
-
         mae, mse, rmse, mape, mspe = metric(preds, trues)
-        print('mse:{}, mae:{}, dtw:{}'.format(mse, mae, dtw))
+        self.metrics_tracker.log_test_metrics(mae=mae, mse=mse, rmse=rmse, mape=mape, mspe=mspe)
+        print('mse:{}, mae:{}'.format(mse, mae))
         result_path = self.args.output_path + '/' + self.args.save_name
         # write datetime and metrics to TXT file
         f = open(result_path, 'a')
