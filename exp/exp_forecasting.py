@@ -520,21 +520,79 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         return self.model
 
+    def analyze_train_attention(self, batch_index=0):
+        """
+        Sau khi train xong, load best model và analyze attention patterns trên train data
+        Args:
+            setting: Model setting string
+            batch_index: Index của batch muốn analyze (0-based)
+            num_batches: Số lượng batches muốn analyze
+        """
+        print(f"🔍 Starting Getting Train Attention Analysis...")
+        print(f"📊 Analyzing batch {batch_index} from train dataset with batch-size is {self.args.batch_size}")
+
+        # # Load best model if weight is not provided
+        # if not self.args.checkpoints:
+        #     if not os.path.exists(self.args.checkpoints):
+        #         print(f"❌ Model checkpoint not found at: {self.args.checkpoints}")
+        #         return
+        #     print(f"📥 Loading best model from: {self.args.checkpoints}")
+        #     self.model.load_state_dict(torch.load(self.args.checkpoints))
+        self.model.eval()
+
+        # Get train data loader
+        train_data, train_loader = self._get_data(flag='train')
+
+        with torch.no_grad():
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(train_loader):
+                # Skip to desired batch index
+                if i < batch_index:
+                    continue
+
+                # Move data to device
+                batch_x = batch_x.float().to(self.device)
+                batch_y = batch_y.float().to(self.device)
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
+
+                # decoder input
+                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+
+                prompt_emb = train_data.get_text_embeddings(index).float().to(self.device)
+
+                # decoder input
+                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+
+                _, attention_weights = self.model(batch_x, batch_x_mark,
+                                                  prompt_emb,
+                                                  dec_inp, batch_y_mark)
+
+                # Log attention maps
+                self.metrics_tracker.log_attention_maps(
+                    attention_weights=attention_weights,
+                    batch_idx=i,
+                    sample_indices=index,
+                    prefix_name='Train'
+                )
+                break
+
     def test(self, test=0):
-        test_data, test_loader = self._get_data(flag='test')
         if test:
-            print('loading model')
+            print('Loading model from checkpoint: ', self.args.checkpoints)
             self.model.load_state_dict(torch.load(self.args.checkpoints))
 
         preds = []
         trues = []
-        output_test_path = self.args.output_path + '/' + self.args.save_name + '/'
+        # extract the cross-attention map from trained model
+        self.analyze_train_attention()
 
         self.model.eval()
-        # self.mlp.eval()
-        # self.mlp_proj.eval()
-        # self.cross_attention.eval()
-        # self.text_to_output_proj.eval()
+
+        print('Start testing phase...')
+        test_data, test_loader = self._get_data(flag='test')
+
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark, index) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device)
@@ -550,16 +608,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
-                outputs, _ = self.model(batch_x, batch_x_mark,
-                                        prompt_emb,
-                                        dec_inp, batch_y_mark)
+                outputs, attention_weights = self.model(batch_x, batch_x_mark,
+                                                        prompt_emb,
+                                                        dec_inp, batch_y_mark)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
 
                 preds.append(pred)
                 trues.append(true)
-                if i % 20 == 0:
+                if i % 1 == 0:
                     try:
                         input = batch_x.detach().cpu().numpy()
                         if test_data.scale and self.args.inverse:
@@ -568,6 +626,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
                         visual(gt, pd, os.path.join(self.args.log_path, str(i) + '.pdf'))
+                        self.metrics_tracker.log_attention_maps(attention_weights=attention_weights, batch_idx=i,
+                                                                sample_indices=index)
                     except Exception as e:
                         print(f"Visualization skipped due to shape mismatch: {e}")
                         pass

@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import pandas as pd
+import seaborn as sns
 import math
 import mlflow
 from torch.utils.tensorboard import SummaryWriter
@@ -54,6 +54,9 @@ class MetricsTracker:
 
         # Best metrics tracking
         self.best_metrics = {}
+
+        # Attention logging counter và index mapping
+        self.attention_batch_count = 0
 
     def start_epoch(self, epoch):
         """Bắt đầu epoch mới"""
@@ -289,6 +292,165 @@ class MetricsTracker:
 
             except Exception as e:
                 print(f"⚠️  Error logging test metrics to TensorBoard: {e}")
+
+    def log_attention_maps(self, attention_weights, batch_idx, sample_indices, prefix_name='Test', batch_text=None):
+        """
+        Log attention maps to TensorBoard
+        Args:
+            :param attention_weights: Tensor of shape [batch_size, seq_ts_len, seq_txt_len]
+            :param batch_idx: Current step for logging
+            :param sample_indices: List of dataset indices for each sample in the batch
+            :param prefix_name:
+            :param batch_text: List of texts for each sample in the batch (optional)
+        """
+        batch_size, seq_ts_len, seq_txt_len = attention_weights.shape
+
+        num_samples_to_log = batch_size
+
+        # Store index mapping for this batch
+        batch_mapping = {}
+
+        # 1. LOG INDIVIDUAL SAMPLES với Index Information
+        for sample_idx in range(num_samples_to_log):
+            original_index = sample_indices[sample_idx].item() if torch.is_tensor(sample_indices[sample_idx]) else \
+                sample_indices[sample_idx]
+            sample_attention = attention_weights[sample_idx]  # [seq_ts_len, seq_txt_len]
+
+            # Store mapping
+            logged_key = f"batch_{batch_idx:03d}_sample_{sample_idx:02d}"
+            batch_mapping[logged_key] = {
+                'original_index': original_index,
+                'batch_idx': batch_idx,
+                'sample_idx_in_batch': sample_idx,
+                'attention_shape': [seq_ts_len, seq_txt_len]
+            }
+
+            # Convert to numpy
+            attention_matrix = sample_attention.cpu().numpy()
+
+            # Create detailed heatmap cho từng sample với index info
+            fig, ax = plt.subplots(figsize=(14, 10))
+
+            # Use more detailed colormap
+            im = ax.imshow(attention_matrix, cmap='plasma', aspect='auto', interpolation='nearest')
+
+            # Add colorbar
+            cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+            cbar.set_label('Attention Weight', rotation=270, labelpad=20)
+
+            # Set labels and title với index information
+            ax.set_xlabel(f'Text Token Positions (Length: {seq_txt_len})')
+            ax.set_ylabel(f'Time Series Positions (Length: {seq_ts_len})')
+            ax.set_title(f'Attention Map - Dataset Index: {original_index}\n'
+                         f'Batch {batch_idx}, Sample {sample_idx} | TS→Text Cross-Attention')
+
+            # Add comprehensive information box
+            info_text = f'Dataset Index: {original_index}\n' \
+                        f'Batch: {batch_idx}, Sample: {sample_idx}\n' \
+                        f'Shape: {seq_ts_len}×{seq_txt_len}\n' \
+                        f'Max: {torch.max(sample_attention):.4f}\n' \
+                        f'Mean: {torch.mean(sample_attention):.4f}'
+
+            # Add text information if available
+            if batch_text and sample_idx < len(batch_text):
+                text_preview = str(batch_text[sample_idx])[:150] + "..." if len(
+                    str(batch_text[sample_idx])) > 150 else str(batch_text[sample_idx])
+                info_text += f'\n\nText Preview:\n{text_preview}'
+
+            ax.text(0.02, 0.98, info_text,
+                    transform=ax.transAxes, fontsize=9, verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.9))
+
+            # LOG TO TENSORBOARD
+            if self.writer:
+                tag_name = f'{prefix_name}_Attention_Maps/Batch_{batch_idx:03d}/Index_{original_index:06d}_Sample_{sample_idx:02d}'
+                self.writer.add_figure(tag_name, fig, global_step=self.attention_batch_count)
+            # LOG TO MLFLOW
+            if self.mlflow_bool:
+                # Log figure
+                artifact_name = f"{prefix_name.lower()}_attention_batch{batch_idx:03d}_idx{original_index:06d}_sample{sample_idx:02d}.png"
+                mlflow.log_figure(fig, artifact_name)
+
+            plt.close(fig)
+
+        # 2. LOG SAMPLE COMPARISON với indices
+        if num_samples_to_log > 1:  # make the group figure
+            self._log_attention_samples_comparison(
+                attention_weights[:num_samples_to_log],
+                batch_idx,
+                sample_indices[:num_samples_to_log],
+                prefix_name
+            )
+
+        # 3. LOG INDEX MAPPING TABLE
+        self._log_index_mapping_table(batch_idx, batch_mapping, prefix_name)
+
+        # Increment counter
+        self.attention_batch_count += 1
+
+        print(f"✅ Logged attention maps for Batch {batch_idx} ({num_samples_to_log}/{batch_size} samples)")
+        print(
+            f"   📍 Dataset indices: {[sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i] for i in range(num_samples_to_log)]}")
+
+    def _log_attention_samples_comparison(self, attention_weights, batch_idx, sample_indices, prefix_name):
+        """Log comparison between samples trong cùng batch với index info"""
+        num_samples = attention_weights.shape[0]
+
+        # Create subplot grid để compare samples
+        cols = min(4, num_samples)
+        rows = (num_samples + cols - 1) // cols
+
+        fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 4 * rows))
+        if rows == 1 and cols == 1:
+            axes = [axes]
+        elif rows == 1 or cols == 1:
+            axes = axes.flatten()
+        else:
+            axes = axes.flatten()
+
+        for i in range(num_samples):
+            ax = axes[i] if len(axes) > 1 else axes
+            attention_matrix = attention_weights[i].cpu().numpy()
+            original_idx = sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i]
+
+            im = ax.imshow(attention_matrix, cmap='viridis', aspect='auto')
+            ax.set_title(f'Index {original_idx}\n(Sample {i})', fontsize=10)
+            ax.set_xlabel('Text Tokens')
+            ax.set_ylabel('TS Steps')
+
+            # Add index info
+            ax.text(0.02, 0.98, f'Idx: {original_idx}\n',
+                    transform=ax.transAxes, fontsize=8, verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+        # Hide unused subplots
+        for i in range(num_samples, len(axes)):
+            axes[i].set_visible(False)
+
+        plt.tight_layout()
+        indices_str = [sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i] for i
+                       in range(num_samples)]
+        plt.suptitle(f'Batch {batch_idx} - Samples Comparison\nDataset Indices: {indices_str}',
+                     y=1.02, fontsize=12)
+
+        self.writer.add_figure(f'{prefix_name}_Attention_Sample_Comparisons/Batch_{batch_idx:03d}_Comparison',
+                               fig, self.attention_batch_count)
+        plt.close(fig)
+
+    def _log_index_mapping_table(self, batch_idx, batch_mapping, prefix_name):
+        """Log bảng mapping giữa logged samples và dataset indices"""
+        mapping_text = f"## Batch {batch_idx} - Index Mapping\n\n"
+        mapping_text += "| Logged Key | Dataset Index |\n"
+        mapping_text += "|------------|---------------|\n"
+
+        for logged_key, info in batch_mapping.items():
+            mapping_text += f"| {logged_key} | {info['original_index']} | {info['sample_idx_in_batch']} |\n"
+
+        mapping_text += f"\n**Total samples logged in this batch**: {len(batch_mapping)}\n"
+        mapping_text += f"**TensorBoard Path**: `Attention_Maps/Batch_{batch_idx:03d}/`\n"
+
+        self.writer.add_text(f'{prefix_name}_Index_Mappings/Batch_{batch_idx:03d}_Mapping', mapping_text,
+                             self.attention_batch_count)
 
     def get_epoch_summary(self):
         """Trả về summary của epoch hiện tại"""
