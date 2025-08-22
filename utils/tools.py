@@ -254,6 +254,59 @@ class MetricsTracker:
 
         return total_norm
 
+    def log_test_metrics(self, mae, mse, rmse, mape, mspe):
+        """
+        Log final test metrics to MLflow and TensorBoard
+        Args:
+            mae: Mean Absolute Error
+            mse: Mean Squared Error
+            rmse: Root Mean Squared Error
+            mape: Mean Absolute Percentage Error
+            mspe: Mean Squared Percentage Error
+        """
+        # MLflow logging
+        if self.mlflow_bool:
+            try:
+                # Log grouped test metrics for comparison
+                mlflow.log_metric("test_metrics/mae", mae)
+                mlflow.log_metric("test_metrics/mse", mse)
+                mlflow.log_metric("test_metrics/rmse", rmse)
+                mlflow.log_metric("test_metrics/mape", mape)
+                mlflow.log_metric("test_metrics/mspe", mspe)
+
+            except Exception as e:
+                print(f"⚠️  Error logging test metrics to MLflow: {e}")
+
+        # TensorBoard logging
+        if self.writer:
+            try:
+                # Log individual test metrics (step=0 for final test results)
+                self.writer.add_scalar('test_metrics/MAE', mae, 0)
+                self.writer.add_scalar('test_metrics/MSE', mse, 0)
+                self.writer.add_scalar('test_metrics/RMSE', rmse, 0)
+                self.writer.add_scalar('test_metrics/MAPE', mape, 0)
+                self.writer.add_scalar('test_metrics/MSPE', mspe, 0)
+
+                # Create histogram for metric comparison
+                metrics_dict = {
+                    'MAE': mae,
+                    'MSE': mse,
+                    'RMSE': rmse,
+                    'MAPE': mape,
+                    'MSPE': mspe
+                }
+
+                # Log as text summary for easy viewing
+                metric_summary = '\n'.join([f'{k}: {v:.6f}' for k, v in metrics_dict.items()])
+                self.writer.add_text('Test_Metrics_Summary', metric_summary, 0)
+
+                # Alternative: Log using different timestep for each metric for comparison bar chart
+                for i, (metric_name, value) in enumerate(metrics_dict.items()):
+                    self.writer.add_scalar('Test_Metrics_Comparison', value, i)
+
+            except Exception as e:
+                print(f"⚠️  Error logging test metrics to TensorBoard: {e}")
+
     def get_epoch_summary(self):
         """Trả về summary của epoch hiện tại"""
         summary = {}
