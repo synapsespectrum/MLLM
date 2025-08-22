@@ -585,8 +585,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
-        # extract the cross-attention map from trained model
-        self.analyze_train_attention()
+        # # extract the cross-attention map from a trained dataset
+        # self.analyze_train_attention()
 
         self.model.eval()
 
@@ -626,17 +626,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
                         visual(gt, pd, os.path.join(self.args.log_path, str(i) + '.pdf'))
-                        self.metrics_tracker.log_attention_maps(attention_weights=attention_weights, batch_idx=i,
-                                                                sample_indices=index)
+                        # self.metrics_tracker.log_attention_maps(attention_weights=attention_weights, batch_idx=i,
+                        #                                         sample_indices=index)
                     except Exception as e:
                         print(f"Visualization skipped due to shape mismatch: {e}")
                         pass
 
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
-        print('test shape:', preds.shape, trues.shape)
-        # preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-        # trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         print('test shape:', preds.shape, trues.shape)
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
