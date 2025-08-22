@@ -62,8 +62,8 @@ do
         dataset=$(basename ${data_path} .csv)  # Extract dataset name from data_path
         # Create a directory for the dataset if it doesn't exist
         mkdir -p "./logs/${experiment_name}/${dataset}"
-        # if SocialGood.csv, use batch size 16
-        if [[ "$data_path" == *"SocialGood.csv"* ]]; then
+        # if Security.csv, use batch size 16
+        if [[ "$data_path" == *"Security.csv"* ]]; then
           batch_size=16
         else
           batch_size=32
