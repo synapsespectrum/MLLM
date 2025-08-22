@@ -287,23 +287,6 @@ class MetricsTracker:
                 self.writer.add_scalar('test_metrics/MAPE', mape, 0)
                 self.writer.add_scalar('test_metrics/MSPE', mspe, 0)
 
-                # Create histogram for metric comparison
-                metrics_dict = {
-                    'MAE': mae,
-                    'MSE': mse,
-                    'RMSE': rmse,
-                    'MAPE': mape,
-                    'MSPE': mspe
-                }
-
-                # Log as text summary for easy viewing
-                metric_summary = '\n'.join([f'{k}: {v:.6f}' for k, v in metrics_dict.items()])
-                self.writer.add_text('Test_Metrics_Summary', metric_summary, 0)
-
-                # Alternative: Log using different timestep for each metric for comparison bar chart
-                for i, (metric_name, value) in enumerate(metrics_dict.items()):
-                    self.writer.add_scalar('Test_Metrics_Comparison', value, i)
-
             except Exception as e:
                 print(f"⚠️  Error logging test metrics to TensorBoard: {e}")
 
