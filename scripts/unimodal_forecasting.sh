@@ -68,7 +68,7 @@ do
           label_len=$((input_len / 2))
 
           echo "Running experiment: Dataset=$dataset, Model=$model_name, Input_len=$input_len, Pred_len=$pred_len, Seed=$seed"
-          echo "Log saved to ./benchmarks/logs/${dataset}/terminal_il${input_len}_pl${pred_len}.log"
+          echo "Log saved to ./benchmarks/logs/${dataset}/terminal_${model_name}_il${input_len}_pl${pred_len}.log"
 
           # Run the experiment
           python -u run_unimodal.py \
