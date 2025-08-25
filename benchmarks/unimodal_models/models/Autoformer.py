@@ -21,7 +21,6 @@ class Model(nn.Module):
         self.seq_len = configs.seq_len
         self.label_len = configs.label_len
         self.pred_len = configs.pred_len
-        self.output_attention = configs.output_attention
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -36,7 +35,7 @@ class Model(nn.Module):
                 EncoderLayer(
                     AutoCorrelationLayer(
                         AutoCorrelation(False, configs.factor, attention_dropout=configs.dropout,
-                                        output_attention=configs.output_attention),
+                                        output_attention=False),
                         configs.d_model, configs.n_heads),
                     configs.d_model,
                     configs.d_ff,
@@ -102,6 +101,7 @@ class Model(nn.Module):
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
         enc_out, attns = self.encoder(enc_out, attn_mask=None)
         # dec
+        # x_mark_dec = torch.cat([x_mark_enc[-self.label_len:], x_mark_dec], dim=1)
         dec_out = self.dec_embedding(seasonal_init, x_mark_dec)
         seasonal_part, trend_part = self.decoder(dec_out, enc_out, x_mask=None, cross_mask=None,
                                                  trend=trend_init)

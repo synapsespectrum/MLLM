@@ -146,25 +146,39 @@ class Dataset_Custom(Dataset):
 
         return x_start_dates, x_end_dates
 
-    def __getitem__(self, index):
-        feat_id = index // self.tot_len
-        s_begin = index % self.tot_len
+    # def __getitem__(self, index):
+    #     feat_id = index // self.tot_len
+    #     s_begin = index % self.tot_len
+    #
+    #     s_end = s_begin + self.seq_len
+    #     r_begin = s_end - self.label_len
+    #     r_end = r_begin + self.label_len + self.pred_len
+    #
+    #     seq_x = self.data_x[s_begin:s_end, feat_id:feat_id + 1] if len(self.data_x.shape) > 1 else self.data_x[
+    #                                                                                                s_begin:s_end].reshape(
+    #         -1, 1)
+    #     seq_y = self.data_y[r_begin:r_end, feat_id:feat_id + 1] if len(self.data_y.shape) > 1 else self.data_y[
+    #                                                                                                r_begin:r_end].reshape(
+    #         -1, 1)
+    #
+    #     seq_x_mark = self.data_stamp[s_begin:s_end]
+    #     seq_y_mark = self.data_stamp[r_begin:r_end]
+    #
+    #     return seq_x, seq_y, seq_x_mark, seq_y_mark
 
+    def __getitem__(self, index):
+        s_begin = index
         s_end = s_begin + self.seq_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
 
-        seq_x = self.data_x[s_begin:s_end, feat_id:feat_id + 1] if len(self.data_x.shape) > 1 else self.data_x[
-                                                                                                   s_begin:s_end].reshape(
-            -1, 1)
-        seq_y = self.data_y[r_begin:r_end, feat_id:feat_id + 1] if len(self.data_y.shape) > 1 else self.data_y[
-                                                                                                   r_begin:r_end].reshape(
-            -1, 1)
-
+        seq_x = self.data_x[s_begin:s_end]
+        seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
 
         return seq_x, seq_y, seq_x_mark, seq_y_mark
+
 
     def __len__(self):
         if hasattr(self, 'tot_len') and self.tot_len > 0:

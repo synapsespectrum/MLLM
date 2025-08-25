@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # forecasting task
     parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
-    parser.add_argument('--label_len', type=int, default=0, help='start token length')
+    parser.add_argument('--label_len', type=int, default=4, help='start token length')
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
     parser.add_argument('--seasonal_patterns', type=str, default='Monthly', help='subset for M4')
     parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
@@ -38,9 +38,9 @@ if __name__ == '__main__':
     # model define
     parser.add_argument('--top_k', type=int, default=5, help='for TimesBlock')
     parser.add_argument('--num_kernels', type=int, default=6, help='for Inception')
-    parser.add_argument('--enc_in', type=int, default=7, help='encoder input size')
-    parser.add_argument('--dec_in', type=int, default=7, help='decoder input size')
-    parser.add_argument('--c_out', type=int, default=7, help='output size')
+    parser.add_argument('--enc_in', type=int, default=1, help='encoder input size')
+    parser.add_argument('--dec_in', type=int, default=1, help='decoder input size')
+    parser.add_argument('--c_out', type=int, default=1, help='output size')
     parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
     parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
     parser.add_argument('--e_layers', type=int, default=2, help='num of encoder layers')
@@ -94,6 +94,7 @@ if __name__ == '__main__':
         args.enc_in = 1
         args.dec_in = 1
         args.c_out = 1
+    args.label_len = args.seq_len // 2
 
     # Set random seed
     fix_seed = args.seed

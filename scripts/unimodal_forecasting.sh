@@ -22,7 +22,7 @@ dataset_configs["SocialGood"]="8,24:6,8,10,12"
 dataset_configs["Traffic"]="8,24:6,8,10,12"
 
 # Define datasets and paths
-root_path="/home/andrew/github/pb/TaTS/data"
+root_path="./data"
 datasets=("Agriculture" "Climate" "Economy" "Energy" "Environment" "Health" "Security" "SocialGood" "Traffic")
 
 # Seeds for reproducibility
@@ -65,11 +65,13 @@ do
             batch_size=32
           fi
 
+          label_len=$((input_len / 2))
+
           echo "Running experiment: Dataset=$dataset, Model=$model_name, Input_len=$input_len, Pred_len=$pred_len, Seed=$seed"
-          echo "Log saved to ./benchmarks/logs/${dataset}/terminal.log"
+          echo "Log saved to ./benchmarks/logs/${dataset}/terminal_il${input_len}_pl${pred_len}.log"
 
           # Run the experiment
-          python -u benchmarks/unimodal-models/run.py \
+          python -u run_unimodal.py \
             --is_training 1 \
             --batch_size $batch_size \
             --root_path $root_path \
@@ -79,7 +81,7 @@ do
             --data $dataset \
             --features S \
             --seq_len $input_len \
-            --label_len 0 \
+            --label_len $label_len \
             --pred_len $pred_len \
             --des "Exp_il${input_len}_pl${pred_len}" \
             --seed $seed \
