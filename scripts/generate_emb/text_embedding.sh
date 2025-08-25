@@ -11,12 +11,12 @@ declare -A dataset_input_lens
 dataset_input_lens["Environment"]="84 24"
 dataset_input_lens["Energy"]="36 24"
 dataset_input_lens["Health"]="36 24"
-dataset_input_lens["Agriculture"]="8 12"
-dataset_input_lens["Climate"]="8 12"
-dataset_input_lens["Economy"]="8 12"
-dataset_input_lens["Security"]="8 12"
-dataset_input_lens["SocialGood"]="8 12"
-dataset_input_lens["Traffic"]="8 12"
+dataset_input_lens["Agriculture"]="8 24"
+dataset_input_lens["Climate"]="8 24"
+dataset_input_lens["Economy"]="8 24"
+dataset_input_lens["Security"]="8 24"
+dataset_input_lens["SocialGood"]="8 24"
+dataset_input_lens["Traffic"]="8 24"
 
 # Create log directories if they don't exist
 mkdir -p ./log-emb/text_emb_logs/${llm_model}/
