@@ -161,7 +161,7 @@ class Dataset_Custom(Dataset):
     def load_embeddings(self):
         """Load pre-embedded text data from h5 files"""
         dataset_name = self.data_path.replace('.csv', '')
-        embedding_dir = os.path.join(self.embedding_path, self.embedding_model, dataset_name, str(self.seq_len))
+        embedding_dir = os.path.join(self.embedding_path, self.embedding_model, dataset_name, str(self.seq_len), self.flag)
 
         try:
             print(f"Loading embeddings from {embedding_dir}")
