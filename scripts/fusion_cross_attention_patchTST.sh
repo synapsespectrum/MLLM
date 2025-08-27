@@ -6,7 +6,7 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
-all_models=("iTransformer")
+all_models=("PatchTST")
 start_index=$1
 end_index=$2
 
@@ -49,7 +49,7 @@ llm_model="GPT2"
 use_fullmodel=0
 prompt_weight=0.5
 embedding_path="/home/andrew/github/MLLM/Embeddings/text"
-experiment_name="fusion_cross_attention_patchTST"
+experiment_name="fusion_cross_attention"
 
 # Create folder for saving results
 mkdir -p "./logs/${experiment_name}"
