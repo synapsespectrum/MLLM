@@ -35,8 +35,8 @@ class Model(nn.Module):
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
         padding = stride
-        if patch_len>configs.pred_len:
-            patch_len = configs.pred_len
+        # if patch_len>configs.pred_len:
+        patch_len = configs.patch_len
         # patching and embedding
         self.patch_embedding = PatchEmbedding(
             configs.d_model, patch_len, stride, padding, configs.dropout)
@@ -89,8 +89,8 @@ class Model(nn.Module):
         # z: [bs * nvars x patch_num x d_model]
         enc_out, attns = self.encoder(enc_out)
         # z: [bs x nvars x patch_num x d_model]
-        enc_out = torch.reshape(
-            enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1]))
+        # enc_out = torch.reshape(
+        #     enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1]))
         # z: [bs x nvars x d_model x patch_num]
         return enc_out
         enc_out = enc_out.permute(0, 1, 3, 2)

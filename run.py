@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--expand', type=int, default=2, help='expansion factor for Mamba')
     parser.add_argument('--d_conv', type=int, default=4, help='conv kernel size for Mamba')
     parser.add_argument('--top_k', type=int, default=5, help='for TimesBlock')
+    parser.add_argument('--patch_len', type=int, default=16, help='patch length')
     parser.add_argument('--num_kernels', type=int, default=6, help='for Inception')
     parser.add_argument('--enc_in', type=int, default=7, help='encoder input size')
     parser.add_argument('--dec_in', type=int, default=7, help='decoder input size')

@@ -8,3 +8,5 @@ torchvision
 mlflow
 tensorboard
 reformer_pytorch
+h5py
+transformers
