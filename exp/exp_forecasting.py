@@ -407,7 +407,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
                 outputs, _ = self.model(batch_x, batch_x_mark,
                                         prompt_emb,
-                                        dec_inp, batch_y_mark)
+                                        dec_inp, batch_y_mark,
+                                        prior_y)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
@@ -468,7 +469,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 # TS-LLM Fusion Model Forward Pass
                 outputs, _ = self.model(batch_x, batch_x_mark,
                                         prompt_emb,
-                                        dec_inp, batch_y_mark)
+                                        dec_inp, batch_y_mark,
+                                        prior_y)
 
                 loss = criterion(outputs, batch_y)
                 train_loss.append(loss.item())
@@ -610,7 +612,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
                 outputs, attention_weights = self.model(batch_x, batch_x_mark,
                                                         prompt_emb,
-                                                        dec_inp, batch_y_mark)
+                                                        dec_inp, batch_y_mark,
+                                                        prior_y)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()

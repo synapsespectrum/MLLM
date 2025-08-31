@@ -230,7 +230,7 @@ class TSLLMFusionModel(nn.Module):
 
     def forward(self, x_enc: torch.Tensor, x_mark_enc: torch.Tensor,
                 prompt_emb: torch.Tensor, x_dec: Optional[torch.Tensor] = None,
-                x_mark_dec: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+                x_mark_dec: Optional[torch.Tensor] = None, prior_y=None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass
 
@@ -284,6 +284,8 @@ class TSLLMFusionModel(nn.Module):
         if self.use_residual and hasattr(self, 'ts_direct_proj'):
             ts_direct_features = ts_output.mean(dim=1)  # [batch_size, d_model]
             ts_direct = self.ts_direct_proj(ts_direct_features)  # [batch_size, pred_len]
+            if prior_y is not None:
+                ts_direct = ts_direct + prior_y
 
             # Weighted combination
             fusion_weight = torch.sigmoid(self.fusion_weight)  # Ensure 0-1 range
