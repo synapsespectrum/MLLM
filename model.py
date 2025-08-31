@@ -285,6 +285,7 @@ class TSLLMFusionModel(nn.Module):
             ts_direct_features = ts_output.mean(dim=1)  # [batch_size, d_model]
             ts_direct = self.ts_direct_proj(ts_direct_features)  # [batch_size, pred_len]
             if prior_y is not None:
+                prior_y = prior_y.squeeze(-1)  # [batch_size, pred_len]
                 ts_direct = ts_direct + prior_y
 
             # Weighted combination
