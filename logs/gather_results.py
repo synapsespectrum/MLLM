@@ -127,7 +127,7 @@ def main():
     output_file = os.path.join(base_dir, 'summary_results.csv')
 
     # Define CSV headers
-    headers = ['dataset', 'input_length', 'prediction_length', 'model', 'mse', 'mae', 'rmse', 'mape', 'mspe']
+    headers = ['dataset', 'model', 'input_length', 'prediction_length', 'mse', 'mae', 'rmse', 'mape', 'mspe']
 
     results = []
 
@@ -158,9 +158,9 @@ def main():
 
                 results.append({
                     'dataset': dataset_dir,
+                    'model': model,
                     'input_length': input_length,
                     'prediction_length': prediction_length,
-                    'model': model,
                     'mse': metrics.get('mse', ''),
                     'mae': metrics.get('mae', ''),
                     'rmse': metrics.get('rmse', ''),
