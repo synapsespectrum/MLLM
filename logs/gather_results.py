@@ -124,7 +124,7 @@ def main():
     """
     args = parse_args()
     base_dir = args.experiment_dir
-    output_file = os.path.join(base_dir, 'summary_results.csv')
+    output_file = os.path.join(base_dir, 'ttf.csv')
 
     # Define CSV headers
     headers = ['dataset', 'model', 'input_length', 'prediction_length', 'mse', 'mae', 'rmse', 'mape', 'mspe']
