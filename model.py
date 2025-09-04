@@ -284,9 +284,9 @@ class TSLLMFusionModel(nn.Module):
         if self.use_residual and hasattr(self, 'ts_direct_proj'):
             ts_direct_features = ts_output.mean(dim=1)  # [batch_size, d_model]
             ts_direct = self.ts_direct_proj(ts_direct_features)  # [batch_size, pred_len]
-            if prior_y is not None:
-                prior_y = prior_y.squeeze(-1)  # [batch_size, pred_len]
-                ts_direct = ts_direct + prior_y
+        if prior_y is not None:
+            prior_y = prior_y.squeeze(-1)  # [batch_size, pred_len]
+            forecast_output = forecast_output + prior_y
 
             # Weighted combination
             fusion_weight = torch.sigmoid(self.fusion_weight)  # Ensure 0-1 range
