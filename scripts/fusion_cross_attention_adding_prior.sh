@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # Load environment variables from .env file if it exists
@@ -41,13 +40,13 @@ get_patch_len() {
 }
 
 # Define datasets and paths
-root_path="/home/andrew/github/pb/TaTS/data"
+root_path="./data"
 datasets=("Agriculture" "Climate" "Economy" "Energy" "Environment" "Health" "Security" "SocialGood" "Traffic")
 
 seeds=(2025)
 llm_model="GPT2"
 use_fullmodel=0
-prompt_weight=0.5
+prompt_weights=(0.1 0.2 0.5 0.8) # Tunable prompt weights
 embedding_path="/home/andrew/github/MLLM/Embeddings/text"
 experiment_name="fusion_cross_attention_adding_prior"
 
@@ -82,54 +81,57 @@ do
 
         for pred_len in "${pred_len_array[@]}"
         do
-          data_path="${dataset}.csv"
-          model_id=$(basename ${root_path})
+          for prompt_weight in "${prompt_weights[@]}"
+          do
+            data_path="${dataset}.csv"
+            model_id=$(basename ${root_path})
 
-          # Adjust batch size for larger datasets
-          if [[ "$dataset" == "Security" ]]; then
-            batch_size=16
-          else
-            batch_size=32
-          fi
+            # Adjust batch size for larger datasets
+            if [[ "$dataset" == "Security" ]]; then
+              batch_size=16
+            else
+              batch_size=32
+            fi
 
-          echo "Running experiment: Dataset=$dataset, Model=$model_name, Input_len=$input_len, Pred_len=$pred_len, Patch_len=$patch_len"
-          echo "Log saved to ./logs/${experiment_name}/${dataset}/terminal_il${input_len}_pl${pred_len}_patch${patch_len}.log"
+            echo "Running experiment: Dataset=$dataset, Model=$model_name, Input_len=$input_len, Pred_len=$pred_len, Patch_len=$patch_len, Prompt_weight=$prompt_weight"
+            echo "Log saved to ./logs/${experiment_name}/${dataset}/terminal_il${input_len}_pl${pred_len}_patch${patch_len}_pw${prompt_weight}.log"
 
-          python -u run.py \
-            --experiment_name $experiment_name \
-            --task_name long_term_forecast \
-            --is_training 1 \
-            --tracking_mlflow 1 \
-            --batch_size $batch_size \
-            --root_path $root_path \
-            --data_path $data_path \
-            --model_id "${model_id}_${dataset}_il${input_len}_pl${pred_len}_patch${patch_len}" \
-            --model $model_name \
-            --data $dataset \
-            --features S \
-            --seq_len $input_len \
-            --label_len 0 \
-            --pred_len $pred_len \
-            --patch_len $patch_len \
-            --embedding_path $embedding_path \
-            --des "Exp_il${input_len}_pl${pred_len}_patch${patch_len}" \
-            --seed $seed \
-            --type_tag "#F#" \
-            --text_len 4 \
-            --prompt_weight $prompt_weight \
-            --pool_type "avg" \
-            --save_name "results_il${input_len}_pl${pred_len}.txt" \
-            --llm_model $llm_model \
-            --huggingface_token "${HUGGINGFACE_TOKEN}" \
-            --train_epochs 100 \
-            --patience 20 | ts '[%Y-%m-%d %H:%M:%S]' >> "./logs/${experiment_name}/${dataset}/terminal_il${input_len}_pl${pred_len}_patch${patch_len}.log" 2>&1
+            python -u run.py \
+              --experiment_name $experiment_name \
+              --task_name long_term_forecast \
+              --is_training 1 \
+              --tracking_mlflow 1 \
+              --batch_size $batch_size \
+              --root_path $root_path \
+              --data_path $data_path \
+              --model_id "$il${input_len}_pl${pred_len}_patch${patch_len}_pw${prompt_weight}" \
+              --model $model_name \
+              --data $dataset \
+              --features S \
+              --seq_len $input_len \
+              --label_len 0 \
+              --pred_len $pred_len \
+              --patch_len $patch_len \
+              --embedding_path $embedding_path \
+              --des "Exp_il${input_len}_pl${pred_len}_patch${patch_len}_pw${prompt_weight}" \
+              --seed $seed \
+              --type_tag "#F#" \
+              --text_len 4 \
+              --prompt_weight $prompt_weight \
+              --pool_type "avg" \
+              --save_name "results_il${input_len}_pl${pred_len}.txt" \
+              --llm_model $llm_model \
+              --huggingface_token "${HUGGINGFACE_TOKEN}" \
+              --train_epochs 100 \
+              --patience 20 | ts '[%Y-%m-%d %H:%M:%S]' >> "./logs/${experiment_name}/${dataset}/terminal_il${input_len}_pl${pred_len}_patch${patch_len}_pw${prompt_weight}.log" 2>&1
 
-          # Check if experiment completed successfully
-          if [ $? -eq 0 ]; then
-            echo "✓ Completed: $dataset - $model_name (input_len=$input_len, pred_len=$pred_len, patch_len=$patch_len)"
-          else
-            echo "✗ Failed: $dataset - $model_name (input_len=$input_len, pred_len=$pred_len, patch_len=$patch_len)"
-          fi
+            # Check if experiment completed successfully
+            if [ $? -eq 0 ]; then
+              echo "✓ Completed: $dataset - $model_name (input_len=$input_len, pred_len=$pred_len, patch_len=$patch_len, prompt_weight=$prompt_weight)"
+            else
+              echo "✗ Failed: $dataset - $model_name (input_len=$input_len, pred_len=$pred_len, patch_len=$patch_len, prompt_weight=$prompt_weight)"
+            fi
+          done
         done
       done
     done
