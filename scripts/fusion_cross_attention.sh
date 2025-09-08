@@ -29,7 +29,7 @@ dataset_configs["SocialGood"]="8,24:6,8,10,12"
 dataset_configs["Traffic"]="8,24:6,8,10,12"
 
 # Define datasets and paths
-root_path="/home/andrew/github/pb/TaTS/data"
+root_path="./data"
 datasets=("Agriculture" "Climate" "Economy" "Energy" "Environment" "Health" "Security" "SocialGood" "Traffic")
 
 seeds=(2025)
