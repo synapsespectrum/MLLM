@@ -278,7 +278,7 @@ class TSLLMFusionModel(nn.Module):
         else:
             fused_features = fused_output.mean(dim=1)  # Average pooling
 
-        forecast_output = self.forecasting_head(fused_features)  # [batch_size, pred_len]
+        post_fused_output = self.forecasting_head(fused_features)  # [batch_size, pred_len]
 
         # 6. Optional residual connection
         if self.use_residual and hasattr(self, 'ts_direct_proj'):
@@ -286,11 +286,13 @@ class TSLLMFusionModel(nn.Module):
             ts_direct = self.ts_direct_proj(ts_direct_features)  # [batch_size, pred_len]
             if prior_y is not None:
                 prior_y = prior_y.squeeze(-1)  # [batch_size, pred_len]
-                forecast_output = forecast_output + prior_y
+                post_fused_output = post_fused_output + prior_y
 
             # Weighted combination
             fusion_weight = torch.sigmoid(self.fusion_weight)  # Ensure 0-1 range
-            forecast_output = fusion_weight * forecast_output + (1 - fusion_weight) * ts_direct
+            forecast_output = fusion_weight * post_fused_output + (1 - fusion_weight) * ts_direct
+        else:
+            forecast_output = post_fused_output
 
         # 7. Reshape for compatibility: [batch_size, pred_len, n_vars]
         forecast_output = forecast_output.unsqueeze(-1).expand(-1, -1, n_vars)
