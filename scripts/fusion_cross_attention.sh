@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # Load environment variables from .env file if it exists
@@ -14,19 +13,30 @@ end_index=$2
 declare -A dataset_configs
 
 # Environment datasets: input_len 84,24 → pred_lengths 24,96,192,336
-dataset_configs["Environment"]="84,24:24,96,192,336"
+# dataset_configs["Environment"]="84,24:24,96,192,336"
 
 # Energy, Health datasets: input_len 36,24 → pred_lengths 12,24,36,48
-dataset_configs["Energy"]="36,24:12,24,36,48"
-dataset_configs["Health"]="36,24:12,24,36,48"
+# dataset_configs["Energy"]="36,24:12,24,36,48"
+# dataset_configs["Health"]="36,24:12,24,36,48"
 
 # Agriculture, Climate, Economy, Security, Social Good, Traffic: input_len 8,24 → pred_lengths 6,8,10,12
-dataset_configs["Agriculture"]="8,24:6,8,10,12"
-dataset_configs["Climate"]="8,24:6,8,10,12"
-dataset_configs["Economy"]="8,24:6,8,10,12"
-dataset_configs["Security"]="8,24:6,8,10,12"
-dataset_configs["SocialGood"]="8,24:6,8,10,12"
-dataset_configs["Traffic"]="8,24:6,8,10,12"
+# dataset_configs["Agriculture"]="8,24:6,8,10,12"
+# dataset_configs["Climate"]="8,24:6,8,10,12"
+# dataset_configs["Economy"]="8,24:6,8,10,12"
+# dataset_configs["Security"]="8,24:6,8,10,12"
+# dataset_configs["SocialGood"]="8,24:6,8,10,12"
+# dataset_configs["Traffic"]="8,24:6,8,10,12"
+
+# config all input 24 pred 24
+dataset_configs["Agriculture"]="24:24"
+dataset_configs["Climate"]="24:24"
+dataset_configs["Economy"]="24:24"
+dataset_configs["Energy"]="24:24"
+dataset_configs["Environment"]="24:24"
+dataset_configs["Health"]="24:24"
+dataset_configs["Security"]="24:24"
+dataset_configs["SocialGood"]="24:24"
+dataset_configs["Traffic"]="24:24"
 
 # Define datasets and paths
 root_path="./data"
@@ -36,8 +46,8 @@ seeds=(2025)
 llm_model="GPT2"
 use_fullmodel=0
 prompt_weight=0.5
-embedding_path="/home/andrew/github/MLLM/Embeddings/text"
-experiment_name="fusion_cross_attention"
+embedding_path="./Embeddings/text"
+experiment_name="Ablation-LLM"
 
 # Create folder for saving results
 mkdir -p "./logs/${experiment_name}"

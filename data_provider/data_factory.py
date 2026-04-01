@@ -1,24 +1,31 @@
-from data_provider.data_loader import Dataset_Custom
 from torch.utils.data import DataLoader
+
+from data_provider.data_loader import Dataset_Custom
 
 
 def data_provider(args, flag):
-    Data = Dataset_Custom
-    timeenc = 0 if args.embed != 'timeF' else 1
+    data = Dataset_Custom
+    timeenc = 0 if args.embed != "timeF" else 1
 
-    shuffle_flag = False if flag == 'test' else True
-    drop_last = True
-    if flag == 'test':
-        drop_last = False
+    shuffle_flag = flag != "test"
+    drop_last = flag != "test"
     batch_size = args.batch_size
     freq = args.freq
 
-    data_set = Data(
-        root_path=args.root_path, flag=flag,
-        seq_len=args.seq_len, label_len=args.label_len, pred_len=args.pred_len,
-        features=args.features, data_path=args.data_path,
-        target=args.target, timeenc=timeenc, freq=freq,
-        use_embeddings=True, embedding_path=args.embedding_path, embedding_model=args.llm_model
+    data_set = data(
+        root_path=args.root_path,
+        flag=flag,
+        seq_len=args.seq_len,
+        label_len=args.label_len,
+        pred_len=args.pred_len,
+        features=args.features,
+        data_path=args.data_path,
+        target=args.target,
+        timeenc=timeenc,
+        freq=freq,
+        use_embeddings=True,
+        embedding_path=args.embedding_path,
+        embedding_model=args.llm_model,
     )
     print(flag, len(data_set))
     data_loader = DataLoader(
@@ -26,5 +33,6 @@ def data_provider(args, flag):
         batch_size=batch_size,
         shuffle=shuffle_flag,
         num_workers=args.num_workers,
-        drop_last=drop_last)
+        drop_last=drop_last,
+    )
     return data_set, data_loader

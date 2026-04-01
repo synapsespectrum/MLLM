@@ -1,35 +1,42 @@
+import math
+import time
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
+import mlflow
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import math
-import mlflow
 from torch.utils.tensorboard import SummaryWriter
-from collections import defaultdict
-import time
 
-plt.switch_backend('agg')
+plt.switch_backend("agg")
 
 
 def adjust_learning_rate(optimizer, epoch, args):
     # lr = args.learning_rate * (0.2 ** (epoch // 2))
-    if args.lradj == 'type1':
+    if args.lradj == "type1":
         lr_adjust = {epoch: args.learning_rate * (0.5 ** ((epoch - 1) // 1))}
-    elif args.lradj == 'type2':
-        lr_adjust = {
-            2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6,
-            10: 5e-7, 15: 1e-7, 20: 5e-8
-        }
+    elif args.lradj == "type2":
+        lr_adjust = {2: 5e-5, 4: 1e-5, 6: 5e-6, 8: 1e-6, 10: 5e-7, 15: 1e-7, 20: 5e-8}
     elif args.lradj == "cosine":
-        lr_adjust = {epoch: args.learning_rate / 2 * (1 + math.cos(epoch / args.train_epochs * math.pi))}
+        lr_adjust = {
+            epoch: args.learning_rate
+            / 2
+            * (1 + math.cos(epoch / args.train_epochs * math.pi))
+        }
     if epoch in lr_adjust.keys():
         lr = lr_adjust[epoch]
         for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
-        print('Updating learning rate to {}'.format(lr))
+            param_group["lr"] = lr
+        print(f"Updating learning rate to {lr}")
 
 
 class MetricsTracker:
-    def __init__(self, writer: SummaryWriter = None, log_iteration_freq=100, tracking_mlflow=False):
+    def __init__(
+        self,
+        writer: SummaryWriter = None,
+        log_iteration_freq=100,
+        tracking_mlflow=False,
+    ):
         """
         Args:
             writer: TensorBoard SummaryWriter
@@ -85,7 +92,7 @@ class MetricsTracker:
         # Calculate iteration time nếu có
         if self.iteration_start_time:
             iteration_time = time.time() - self.iteration_start_time
-            self.iteration_metrics['iteration_time'].append(iteration_time)
+            self.iteration_metrics["iteration_time"].append(iteration_time)
 
         # Log to TensorBoard và MLflow theo frequency
         should_log = (self.global_step % self.log_iteration_freq == 0) or force_log
@@ -100,14 +107,18 @@ class MetricsTracker:
             return
 
         for key, value in metrics_dict.items():
-            self.writer.add_scalar(f'Iteration/{key}', value, self.global_step)
+            self.writer.add_scalar(f"Iteration/{key}", value, self.global_step)
 
         # Log system metrics
         if torch.cuda.is_available():
-            memory_used = torch.cuda.memory_allocated() / 1024 ** 3  # GB
-            memory_cached = torch.cuda.memory_reserved() / 1024 ** 3  # GB
-            self.writer.add_scalar('System/gpu_memory_used_gb', memory_used, self.global_step)
-            self.writer.add_scalar('System/gpu_memory_cached_gb', memory_cached, self.global_step)
+            memory_used = torch.cuda.memory_allocated() / 1024**3  # GB
+            memory_cached = torch.cuda.memory_reserved() / 1024**3  # GB
+            self.writer.add_scalar(
+                "System/gpu_memory_used_gb", memory_used, self.global_step
+            )
+            self.writer.add_scalar(
+                "System/gpu_memory_cached_gb", memory_cached, self.global_step
+            )
 
     def _log_to_mlflow_iteration(self, metrics_dict):
         """Log iteration metrics to MLflow"""
@@ -122,24 +133,36 @@ class MetricsTracker:
 
         for key, values in self.iteration_metrics.items():
             if values:
-                epoch_averages[f'avg_{key}'] = np.mean(values)
-                epoch_averages[f'std_{key}'] = np.std(values)
-                epoch_averages[f'min_{key}'] = np.min(values)
-                epoch_averages[f'max_{key}'] = np.max(values)
+                epoch_averages[f"avg_{key}"] = np.mean(values)
+                epoch_averages[f"std_{key}"] = np.std(values)
+                epoch_averages[f"min_{key}"] = np.min(values)
+                epoch_averages[f"max_{key}"] = np.max(values)
 
         return epoch_averages
 
     def _update_best_metrics(self, epoch_metrics):
         """Update best metrics"""
         for key, value in epoch_metrics.items():
-            if 'loss' in key.lower():
+            if "loss" in key.lower():
                 # For loss metrics, lower is better
-                if key not in self.best_metrics or value < self.best_metrics[key]['value']:
-                    self.best_metrics[key] = {'value': value, 'epoch': self.current_epoch}
+                if (
+                    key not in self.best_metrics
+                    or value < self.best_metrics[key]["value"]
+                ):
+                    self.best_metrics[key] = {
+                        "value": value,
+                        "epoch": self.current_epoch,
+                    }
             else:
                 # For other metrics, higher might be better (depends on metric)
-                if key not in self.best_metrics or value > self.best_metrics[key]['value']:
-                    self.best_metrics[key] = {'value': value, 'epoch': self.current_epoch}
+                if (
+                    key not in self.best_metrics
+                    or value > self.best_metrics[key]["value"]
+                ):
+                    self.best_metrics[key] = {
+                        "value": value,
+                        "epoch": self.current_epoch,
+                    }
 
     def log_epoch_metrics(self, epoch_metrics_dict=None):
         """
@@ -158,7 +181,7 @@ class MetricsTracker:
         # Thêm epoch time
         if self.epoch_start_time:
             epoch_time = time.time() - self.epoch_start_time
-            epoch_averages['epoch_time'] = epoch_time
+            epoch_averages["epoch_time"] = epoch_time
 
         # Thêm epoch-specific metrics
         if epoch_metrics_dict:
@@ -181,30 +204,39 @@ class MetricsTracker:
             return
 
         for key, value in epoch_metrics.items():
-            self.writer.add_scalar(f'Epoch/{key}', value, self.current_epoch)
+            self.writer.add_scalar(f"Epoch/{key}", value, self.current_epoch)
 
         # Special learning curves section
-        if 'train_loss' in epoch_metrics:
-            self.writer.add_scalar('Learning_Curves/Train_Loss',
-                                   epoch_metrics['train_loss'], self.current_epoch)
-        if 'validation_loss' in epoch_metrics:
-            self.writer.add_scalar('Learning_Curves/Validation_Loss',
-                                   epoch_metrics['validation_loss'], self.current_epoch)
-        if 'test_loss' in epoch_metrics:
-            self.writer.add_scalar('Learning_Curves/Test_Loss',
-                                   epoch_metrics['test_loss'], self.current_epoch)
+        if "train_loss" in epoch_metrics:
+            self.writer.add_scalar(
+                "Learning_Curves/Train_Loss",
+                epoch_metrics["train_loss"],
+                self.current_epoch,
+            )
+        if "validation_loss" in epoch_metrics:
+            self.writer.add_scalar(
+                "Learning_Curves/Validation_Loss",
+                epoch_metrics["validation_loss"],
+                self.current_epoch,
+            )
+        if "test_loss" in epoch_metrics:
+            self.writer.add_scalar(
+                "Learning_Curves/Test_Loss",
+                epoch_metrics["test_loss"],
+                self.current_epoch,
+            )
 
         # 🔥 COMBINED LOSS CHART for TensorBoard - same chart with different series
         losses = {}
-        if 'train_loss' in epoch_metrics:
-            losses['Train'] = epoch_metrics['train_loss']
-        if 'validation_loss' in epoch_metrics:
-            losses['Validation'] = epoch_metrics['validation_loss']
-        if 'test_loss' in epoch_metrics:
-            losses['Test'] = epoch_metrics['test_loss']
+        if "train_loss" in epoch_metrics:
+            losses["Train"] = epoch_metrics["train_loss"]
+        if "validation_loss" in epoch_metrics:
+            losses["Validation"] = epoch_metrics["validation_loss"]
+        if "test_loss" in epoch_metrics:
+            losses["Test"] = epoch_metrics["test_loss"]
 
         if losses:
-            self.writer.add_scalars('Losses', losses, self.current_epoch)
+            self.writer.add_scalars("Losses", losses, self.current_epoch)
 
     def _log_to_mlflow_epoch(self, epoch_metrics):
         """Log epoch metrics to MLflow"""
@@ -213,29 +245,37 @@ class MetricsTracker:
         for key, value in epoch_metrics.items():
             mlflow.log_metric(f"epoch_{key}", value, step=self.current_epoch)
         # 🔥 COMBINED LOSS CHART: Log with same prefix for grouping
-        if 'train_loss' in epoch_metrics:
-            mlflow.log_metric("loss/train", epoch_metrics['train_loss'], step=self.current_epoch)
-        if 'validation_loss' in epoch_metrics:
-            mlflow.log_metric("loss/validation", epoch_metrics['validation_loss'], step=self.current_epoch)
-        if 'test_loss' in epoch_metrics:
-            mlflow.log_metric("loss/test", epoch_metrics['test_loss'], step=self.current_epoch)
+        if "train_loss" in epoch_metrics:
+            mlflow.log_metric(
+                "loss/train", epoch_metrics["train_loss"], step=self.current_epoch
+            )
+        if "validation_loss" in epoch_metrics:
+            mlflow.log_metric(
+                "loss/validation",
+                epoch_metrics["validation_loss"],
+                step=self.current_epoch,
+            )
+        if "test_loss" in epoch_metrics:
+            mlflow.log_metric(
+                "loss/test", epoch_metrics["test_loss"], step=self.current_epoch
+            )
 
     def _print_epoch_summary(self, epoch_metrics):
         """In summary của epoch"""
         print(f"📈 Epoch {self.current_epoch + 1} Summary:")
 
         # Key metrics
-        key_metrics = ['train_loss', 'validation_loss', 'test_loss', 'epoch_time']
+        key_metrics = ["train_loss", "validation_loss", "test_loss", "epoch_time"]
         for metric in key_metrics:
             if metric in epoch_metrics:
-                if 'time' in metric:
+                if "time" in metric:
                     print(f"   {metric}: {epoch_metrics[metric]:.2f}s")
                 else:
                     print(f"   {metric}: {epoch_metrics[metric]:.6f}")
 
         # Memory usage
         if torch.cuda.is_available():
-            memory_used = torch.cuda.memory_allocated() / 1024 ** 3
+            memory_used = torch.cuda.memory_allocated() / 1024**3
             print(f"   GPU Memory: {memory_used:.2f}GB")
 
         print("-" * 50)
@@ -247,10 +287,10 @@ class MetricsTracker:
             if p.grad is not None:
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
-        total_norm = total_norm ** (1. / 2)
+        total_norm = total_norm ** (1.0 / 2)
 
         if self.writer:
-            self.writer.add_scalar('Gradients/total_norm', total_norm, self.global_step)
+            self.writer.add_scalar("Gradients/total_norm", total_norm, self.global_step)
 
         return total_norm
 
@@ -281,16 +321,23 @@ class MetricsTracker:
         if self.writer:
             try:
                 # Log individual test metrics (step=0 for final test results)
-                self.writer.add_scalar('test_metrics/MAE', mae, 0)
-                self.writer.add_scalar('test_metrics/MSE', mse, 0)
-                self.writer.add_scalar('test_metrics/RMSE', rmse, 0)
-                self.writer.add_scalar('test_metrics/MAPE', mape, 0)
-                self.writer.add_scalar('test_metrics/MSPE', mspe, 0)
+                self.writer.add_scalar("test_metrics/MAE", mae, 0)
+                self.writer.add_scalar("test_metrics/MSE", mse, 0)
+                self.writer.add_scalar("test_metrics/RMSE", rmse, 0)
+                self.writer.add_scalar("test_metrics/MAPE", mape, 0)
+                self.writer.add_scalar("test_metrics/MSPE", mspe, 0)
 
             except Exception as e:
                 print(f"⚠️  Error logging test metrics to TensorBoard: {e}")
 
-    def log_attention_maps(self, attention_weights, batch_idx, sample_indices, prefix_name='Test', batch_text=None):
+    def log_attention_maps(
+        self,
+        attention_weights,
+        batch_idx,
+        sample_indices,
+        prefix_name="Test",
+        batch_text=None,
+    ):
         """
         Log attention maps to TensorBoard
         Args:
@@ -309,17 +356,22 @@ class MetricsTracker:
 
         # 1. LOG INDIVIDUAL SAMPLES với Index Information
         for sample_idx in range(num_samples_to_log):
-            original_index = sample_indices[sample_idx].item() if torch.is_tensor(sample_indices[sample_idx]) else \
-                sample_indices[sample_idx]
-            sample_attention = attention_weights[sample_idx]  # [seq_ts_len, seq_txt_len]
+            original_index = (
+                sample_indices[sample_idx].item()
+                if torch.is_tensor(sample_indices[sample_idx])
+                else sample_indices[sample_idx]
+            )
+            sample_attention = attention_weights[
+                sample_idx
+            ]  # [seq_ts_len, seq_txt_len]
 
             # Store mapping
             logged_key = f"batch_{batch_idx:03d}_sample_{sample_idx:02d}"
             batch_mapping[logged_key] = {
-                'original_index': original_index,
-                'batch_idx': batch_idx,
-                'sample_idx_in_batch': sample_idx,
-                'attention_shape': [seq_ts_len, seq_txt_len]
+                "original_index": original_index,
+                "batch_idx": batch_idx,
+                "sample_idx_in_batch": sample_idx,
+                "attention_shape": [seq_ts_len, seq_txt_len],
             }
 
             # Convert to numpy
@@ -329,39 +381,56 @@ class MetricsTracker:
             fig, ax = plt.subplots(figsize=(14, 10))
 
             # Use more detailed colormap
-            im = ax.imshow(attention_matrix, cmap='plasma', aspect='auto', interpolation='nearest')
+            im = ax.imshow(
+                attention_matrix, cmap="plasma", aspect="auto", interpolation="nearest"
+            )
 
             # Add colorbar
             cbar = plt.colorbar(im, ax=ax, shrink=0.8)
-            cbar.set_label('Attention Weight', rotation=270, labelpad=20)
+            cbar.set_label("Attention Weight", rotation=270, labelpad=20)
 
             # Set labels and title với index information
-            ax.set_xlabel(f'Text Token Positions (Length: {seq_txt_len})')
-            ax.set_ylabel(f'Time Series Positions (Length: {seq_ts_len})')
-            ax.set_title(f'Attention Map - Dataset Index: {original_index}\n'
-                         f'Batch {batch_idx}, Sample {sample_idx} | TS→Text Cross-Attention')
+            ax.set_xlabel(f"Text Token Positions (Length: {seq_txt_len})")
+            ax.set_ylabel(f"Time Series Positions (Length: {seq_ts_len})")
+            ax.set_title(
+                f"Attention Map - Dataset Index: {original_index}\n"
+                f"Batch {batch_idx}, Sample {sample_idx} | TS→Text Cross-Attention"
+            )
 
             # Add comprehensive information box
-            info_text = f'Dataset Index: {original_index}\n' \
-                        f'Batch: {batch_idx}, Sample: {sample_idx}\n' \
-                        f'Shape: {seq_ts_len}×{seq_txt_len}\n' \
-                        f'Max: {torch.max(sample_attention):.4f}\n' \
-                        f'Mean: {torch.mean(sample_attention):.4f}'
+            info_text = (
+                f"Dataset Index: {original_index}\n"
+                f"Batch: {batch_idx}, Sample: {sample_idx}\n"
+                f"Shape: {seq_ts_len}×{seq_txt_len}\n"
+                f"Max: {torch.max(sample_attention):.4f}\n"
+                f"Mean: {torch.mean(sample_attention):.4f}"
+            )
 
             # Add text information if available
             if batch_text and sample_idx < len(batch_text):
-                text_preview = str(batch_text[sample_idx])[:150] + "..." if len(
-                    str(batch_text[sample_idx])) > 150 else str(batch_text[sample_idx])
-                info_text += f'\n\nText Preview:\n{text_preview}'
+                text_preview = (
+                    str(batch_text[sample_idx])[:150] + "..."
+                    if len(str(batch_text[sample_idx])) > 150
+                    else str(batch_text[sample_idx])
+                )
+                info_text += f"\n\nText Preview:\n{text_preview}"
 
-            ax.text(0.02, 0.98, info_text,
-                    transform=ax.transAxes, fontsize=9, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.9))
+            ax.text(
+                0.02,
+                0.98,
+                info_text,
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.9),
+            )
 
             # LOG TO TENSORBOARD
             if self.writer:
-                tag_name = f'{prefix_name}_Attention_Maps/Batch_{batch_idx:03d}/Index_{original_index:06d}_Sample_{sample_idx:02d}'
-                self.writer.add_figure(tag_name, fig, global_step=self.attention_batch_count)
+                tag_name = f"{prefix_name}_Attention_Maps/Batch_{batch_idx:03d}/Index_{original_index:06d}_Sample_{sample_idx:02d}"
+                self.writer.add_figure(
+                    tag_name, fig, global_step=self.attention_batch_count
+                )
             # LOG TO MLFLOW
             if self.mlflow_bool:
                 # Log figure
@@ -376,7 +445,7 @@ class MetricsTracker:
                 attention_weights[:num_samples_to_log],
                 batch_idx,
                 sample_indices[:num_samples_to_log],
-                prefix_name
+                prefix_name,
             )
 
         # 3. LOG INDEX MAPPING TABLE
@@ -385,11 +454,16 @@ class MetricsTracker:
         # Increment counter
         self.attention_batch_count += 1
 
-        print(f"✅ Logged attention maps for Batch {batch_idx} ({num_samples_to_log}/{batch_size} samples)")
         print(
-            f"   📍 Dataset indices: {[sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i] for i in range(num_samples_to_log)]}")
+            f"✅ Logged attention maps for Batch {batch_idx} ({num_samples_to_log}/{batch_size} samples)"
+        )
+        print(
+            f"   📍 Dataset indices: {[sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i] for i in range(num_samples_to_log)]}"
+        )
 
-    def _log_attention_samples_comparison(self, attention_weights, batch_idx, sample_indices, prefix_name):
+    def _log_attention_samples_comparison(
+        self, attention_weights, batch_idx, sample_indices, prefix_name
+    ):
         """Log comparison between samples trong cùng batch với index info"""
         num_samples = attention_weights.shape[0]
 
@@ -408,30 +482,50 @@ class MetricsTracker:
         for i in range(num_samples):
             ax = axes[i] if len(axes) > 1 else axes
             attention_matrix = attention_weights[i].cpu().numpy()
-            original_idx = sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i]
+            original_idx = (
+                sample_indices[i].item()
+                if torch.is_tensor(sample_indices[i])
+                else sample_indices[i]
+            )
 
-            im = ax.imshow(attention_matrix, cmap='viridis', aspect='auto')
-            ax.set_title(f'Index {original_idx}\n(Sample {i})', fontsize=10)
-            ax.set_xlabel('Text Tokens')
-            ax.set_ylabel('TS Steps')
+            im = ax.imshow(attention_matrix, cmap="viridis", aspect="auto")
+            ax.set_title(f"Index {original_idx}\n(Sample {i})", fontsize=10)
+            ax.set_xlabel("Text Tokens")
+            ax.set_ylabel("TS Steps")
 
             # Add index info
-            ax.text(0.02, 0.98, f'Idx: {original_idx}\n',
-                    transform=ax.transAxes, fontsize=8, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            ax.text(
+                0.02,
+                0.98,
+                f"Idx: {original_idx}\n",
+                transform=ax.transAxes,
+                fontsize=8,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+            )
 
         # Hide unused subplots
         for i in range(num_samples, len(axes)):
             axes[i].set_visible(False)
 
         plt.tight_layout()
-        indices_str = [sample_indices[i].item() if torch.is_tensor(sample_indices[i]) else sample_indices[i] for i
-                       in range(num_samples)]
-        plt.suptitle(f'Batch {batch_idx} - Samples Comparison\nDataset Indices: {indices_str}',
-                     y=1.02, fontsize=12)
+        indices_str = [
+            sample_indices[i].item()
+            if torch.is_tensor(sample_indices[i])
+            else sample_indices[i]
+            for i in range(num_samples)
+        ]
+        plt.suptitle(
+            f"Batch {batch_idx} - Samples Comparison\nDataset Indices: {indices_str}",
+            y=1.02,
+            fontsize=12,
+        )
 
-        self.writer.add_figure(f'{prefix_name}_Attention_Sample_Comparisons/Batch_{batch_idx:03d}_Comparison',
-                               fig, self.attention_batch_count)
+        self.writer.add_figure(
+            f"{prefix_name}_Attention_Sample_Comparisons/Batch_{batch_idx:03d}_Comparison",
+            fig,
+            self.attention_batch_count,
+        )
         plt.close(fig)
 
     def _log_index_mapping_table(self, batch_idx, batch_mapping, prefix_name):
@@ -443,20 +537,27 @@ class MetricsTracker:
         for logged_key, info in batch_mapping.items():
             mapping_text += f"| {logged_key} | {info['original_index']} | {info['sample_idx_in_batch']} |\n"
 
-        mapping_text += f"\n**Total samples logged in this batch**: {len(batch_mapping)}\n"
-        mapping_text += f"**TensorBoard Path**: `Attention_Maps/Batch_{batch_idx:03d}/`\n"
+        mapping_text += (
+            f"\n**Total samples logged in this batch**: {len(batch_mapping)}\n"
+        )
+        mapping_text += (
+            f"**TensorBoard Path**: `Attention_Maps/Batch_{batch_idx:03d}/`\n"
+        )
 
-        self.writer.add_text(f'{prefix_name}_Index_Mappings/Batch_{batch_idx:03d}_Mapping', mapping_text,
-                             self.attention_batch_count)
+        self.writer.add_text(
+            f"{prefix_name}_Index_Mappings/Batch_{batch_idx:03d}_Mapping",
+            mapping_text,
+            self.attention_batch_count,
+        )
 
     def get_epoch_summary(self):
         """Trả về summary của epoch hiện tại"""
         summary = {}
         for key, values in self.iteration_metrics.items():
             if values:
-                summary[f'avg_{key}'] = np.mean(values)
-                summary[f'min_{key}'] = np.min(values)
-                summary[f'max_{key}'] = np.max(values)
+                summary[f"avg_{key}"] = np.mean(values)
+                summary[f"min_{key}"] = np.min(values)
+                summary[f"max_{key}"] = np.max(values)
         return summary
 
     def get_best_metrics_summary(self):
@@ -486,7 +587,7 @@ class EarlyStopping:
             self.save_checkpoint(val_loss, model, path)
         elif score < self.best_score + self.delta:
             self.counter += 1
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -496,19 +597,22 @@ class EarlyStopping:
 
     def save_checkpoint(self, val_loss, model, path):
         if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), path + '/' + 'checkpoint.pth')
+            print(
+                f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ..."
+            )
+        torch.save(model.state_dict(), path + "/" + "checkpoint.pth")
         self.val_loss_min = val_loss
 
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
+
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
 
-class StandardScaler():
+class StandardScaler:
     def __init__(self, mean, std):
         self.mean = mean
         self.std = std
@@ -520,16 +624,16 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds=None, name='./pic/test.pdf'):
+def visual(true, preds=None, name="./pic/test.pdf"):
     """
     Results visualization
     """
     plt.figure()
-    plt.plot(true, label='GroundTruth', linewidth=2)
+    plt.plot(true, label="GroundTruth", linewidth=2)
     if preds is not None:
-        plt.plot(preds, label='Prediction', linewidth=2)
+        plt.plot(preds, label="Prediction", linewidth=2)
     plt.legend()
-    plt.savefig(name, bbox_inches='tight')
+    plt.savefig(name, bbox_inches="tight")
 
 
 def adjustment(gt, pred):

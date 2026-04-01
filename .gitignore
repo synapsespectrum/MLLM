@@ -194,3 +194,17 @@ event*
 *.png
 *.db
 *.ipynb
+
+# research
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep
+mlruns/
+wandb/
+*.bin
+*.model
+
+# template
+./Embeddings/
+models--*

@@ -1,32 +1,41 @@
+import datetime
 import os
+import time
+import warnings
+
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
-import time
-import warnings
-import numpy as np
-import datetime
-from benchmarks.unimodal_models.data_provider.data_factory import data_provider
-from utils.tools import EarlyStopping, adjust_learning_rate, visual, MetricsTracker
-from utils.metrics import metric
 from torch.utils.tensorboard import SummaryWriter
-from benchmarks.unimodal_models.models import Autoformer, Transformer, Informer, Crossformer, iTransformer, PatchTST
 
-warnings.filterwarnings('ignore')
+from benchmarks.unimodal_models.data_provider.data_factory import data_provider
+from benchmarks.unimodal_models.models import (
+    Autoformer,
+    Crossformer,
+    Informer,
+    PatchTST,
+    Transformer,
+    iTransformer,
+)
+from utils.metrics import metric
+from utils.tools import EarlyStopping, MetricsTracker, adjust_learning_rate, visual
+
+warnings.filterwarnings("ignore")
 
 
-class Exp_Basic(object):
+class Exp_Basic:
     def __init__(self, args):
         self.args = args
         self.device = self._acquire_device()
 
         self.model_dict = {
-            'Autoformer': Autoformer,
-            'Transformer': Transformer,
-            'Informer': Informer,
-            'PatchTST': PatchTST,
-            'Crossformer': Crossformer,
-            'iTransformer': iTransformer
+            "Autoformer": Autoformer,
+            "Transformer": Transformer,
+            "Informer": Informer,
+            "PatchTST": PatchTST,
+            "Crossformer": Crossformer,
+            "iTransformer": iTransformer,
         }
         self.device = self._acquire_device()
         self.model = self._build_model().to(self.device)
@@ -35,30 +44,16 @@ class Exp_Basic(object):
         self.__setup_tracking()
 
     def __setup_logging(self):
-        setting = '{}_{}_{}_ft{}sl{}ll{}pl{}dm{}nh{}el{}dl{}df{}fc{}eb{}dt{}{}{}'.format(
-            self.args.model,
-            self.args.model_id,
-            self.args.data,
-            self.args.features,
-            self.args.seq_len,
-            self.args.label_len,
-            self.args.pred_len,
-            self.args.d_model,
-            self.args.n_heads,
-            self.args.e_layers,
-            self.args.d_layers,
-            self.args.d_ff,
-            self.args.factor,
-            self.args.embed,
-            self.args.distil,
-            self.args.des, self.args.run_id)
+        setting = f"{self.args.model}_{self.args.model_id}_{self.args.data}_ft{self.args.features}sl{self.args.seq_len}ll{self.args.label_len}pl{self.args.pred_len}dm{self.args.d_model}nh{self.args.n_heads}el{self.args.e_layers}dl{self.args.d_layers}df{self.args.d_ff}fc{self.args.factor}eb{self.args.embed}dt{self.args.distil}{self.args.des}{self.args.run_id}"
 
         import platform
-        if platform.system() == 'Windows' and len(setting) > 100:
+
+        if platform.system() == "Windows" and len(setting) > 100:
             from datetime import datetime
+
             now = datetime.now().strftime("%Y%m%d_%H%M%S")
             setting = f"{self.args.model}_pl{self.args.pred_len}_{now}"
-            print(f"⚠️  Setting name shortened for Windows compatibility")
+            print("⚠️  Setting name shortened for Windows compatibility")
 
         self.args.setting = setting
         # ./logs/experiment_name/dataset_name
@@ -72,25 +67,25 @@ class Exp_Basic(object):
 
     def __setup_tracking(self):
         # Setup TensorBoard Writer ./logs/{exp_name}/{dataset_name}/{settings}/tensorboard
-        tensorboard_path = os.path.join(self.args.log_path, 'tensorboard')
+        tensorboard_path = os.path.join(self.args.log_path, "tensorboard")
         os.makedirs(tensorboard_path, exist_ok=True)
         self.writer = SummaryWriter(tensorboard_path)
         print(f"📊 TensorBoard logs: {tensorboard_path}")
         # Setup metrics tracker
-        log_iteration_freq = getattr(self.args, 'log_iteration_freq', 10)  # Default 100
+        log_iteration_freq = getattr(self.args, "log_iteration_freq", 10)  # Default 100
         self.metrics_tracker = MetricsTracker(
             writer=self.writer,
             log_iteration_freq=log_iteration_freq,
-            tracking_mlflow=False
+            tracking_mlflow=False,
         )
 
     def close_tracking(self):
         """Đóng tất cả tracking connections"""
-        if hasattr(self, 'writer'):
+        if hasattr(self, "writer"):
             self.writer.close()
             print("📊 TensorBoard writer closed")
 
-        if hasattr(self, 'metrics_tracker'):
+        if hasattr(self, "metrics_tracker"):
             best_metrics = self.metrics_tracker.get_best_metrics_summary()
             print("🏆 Best metrics summary displayed")
 
@@ -100,13 +95,14 @@ class Exp_Basic(object):
 
     def _acquire_device(self):
         if self.args.use_gpu:
-            os.environ["CUDA_VISIBLE_DEVICES"] = str(
-                self.args.gpu) if not self.args.use_multi_gpu else self.args.devices
-            device = torch.device('cuda:{}'.format(self.args.gpu))
-            print('Use GPU: cuda:{}'.format(self.args.gpu))
+            os.environ["CUDA_VISIBLE_DEVICES"] = (
+                str(self.args.gpu) if not self.args.use_multi_gpu else self.args.devices
+            )
+            device = torch.device(f"cuda:{self.args.gpu}")
+            print(f"Use GPU: cuda:{self.args.gpu}")
         else:
-            device = torch.device('cpu')
-            print('Use CPU')
+            device = torch.device("cpu")
+            print("Use CPU")
         return device
 
     def _get_data(self):
@@ -124,7 +120,7 @@ class Exp_Basic(object):
 
 class Exp_Unimodal_Forecast(Exp_Basic):
     def __init__(self, args):
-        super(Exp_Unimodal_Forecast, self).__init__(args)
+        super().__init__(args)
         self.args = args
         self.model = self._build_model().to(self.device)
 
@@ -148,25 +144,33 @@ class Exp_Unimodal_Forecast(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
+                vali_loader
+            ):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
+                dec_inp = (
+                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
+                    .float()
+                    .to(self.device)
+                )
 
                 # forward
                 if self.args.output_attention:
-                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[
+                        0
+                    ]
                 else:
                     outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                f_dim = -1 if self.args.features == "MS" else 0
+                outputs = outputs[:, -self.args.pred_len :, f_dim:]
+                batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(self.device)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
@@ -179,9 +183,9 @@ class Exp_Unimodal_Forecast(Exp_Basic):
         return total_loss
 
     def train(self):
-        train_data, train_loader = self._get_data(flag='train')
-        vali_data, vali_loader = self._get_data(flag='val')
-        test_data, test_loader = self._get_data(flag='test')
+        train_data, train_loader = self._get_data(flag="train")
+        vali_data, vali_loader = self._get_data(flag="val")
+        test_data, test_loader = self._get_data(flag="test")
 
         time_now = time.time()
 
@@ -200,7 +204,9 @@ class Exp_Unimodal_Forecast(Exp_Basic):
 
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
+                train_loader
+            ):
                 iter_count += 1
                 model_optim.zero_grad()
 
@@ -210,39 +216,57 @@ class Exp_Unimodal_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
+                dec_inp = (
+                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
+                    .float()
+                    .to(self.device)
+                )
 
                 # forward
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
                         if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                            outputs = self.model(
+                                batch_x, batch_x_mark, dec_inp, batch_y_mark
+                            )[0]
                         else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                            outputs = self.model(
+                                batch_x, batch_x_mark, dec_inp, batch_y_mark
+                            )
 
-                        f_dim = -1 if self.args.features == 'MS' else 0
-                        outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                        batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                        f_dim = -1 if self.args.features == "MS" else 0
+                        outputs = outputs[:, -self.args.pred_len :, f_dim:]
+                        batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(
+                            self.device
+                        )
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
                     if self.args.output_attention:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                        outputs = self.model(
+                            batch_x, batch_x_mark, dec_inp, batch_y_mark
+                        )[0]
                     else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        outputs = self.model(
+                            batch_x, batch_x_mark, dec_inp, batch_y_mark
+                        )
 
-                    f_dim = -1 if self.args.features == 'MS' else 0
-                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                    batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                    f_dim = -1 if self.args.features == "MS" else 0
+                    outputs = outputs[:, -self.args.pred_len :, f_dim:]
+                    batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(self.device)
                     loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
                 if (i + 1) % 100 == 0:
-                    print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
+                    print(
+                        f"\titers: {i + 1}, epoch: {epoch + 1} | loss: {loss.item():.7f}"
+                    )
                     speed = (time.time() - time_now) / iter_count
-                    left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
-                    print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
+                    left_time = speed * (
+                        (self.args.train_epochs - epoch) * train_steps - i
+                    )
+                    print(f"\tspeed: {speed:.4f}s/iter; left time: {left_time:.4f}s")
                     iter_count = 0
                     time_now = time.time()
 
@@ -255,42 +279,55 @@ class Exp_Unimodal_Forecast(Exp_Basic):
                     model_optim.step()
 
                 # Log to TensorBoard
-                self.writer.add_scalar('train_loss', loss.item(), epoch * train_steps + i)
-                self.metrics_tracker.log_iteration_metrics({
-                    'train_loss': loss.item(),
-                    'learning_rate': model_optim.param_groups[0]['lr']
-                })
+                self.writer.add_scalar(
+                    "train_loss", loss.item(), epoch * train_steps + i
+                )
+                self.metrics_tracker.log_iteration_metrics(
+                    {
+                        "train_loss": loss.item(),
+                        "learning_rate": model_optim.param_groups[0]["lr"],
+                    }
+                )
 
-            print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
+            print(f"Epoch: {epoch + 1} cost time: {time.time() - epoch_time}")
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
 
             # Log to TensorBoard
-            self.metrics_tracker.log_epoch_metrics({
-                'train_loss': train_loss,
-                'validation_loss': vali_loss,
-                'test_loss': test_loss
-            })
+            self.metrics_tracker.log_epoch_metrics(
+                {
+                    "train_loss": train_loss,
+                    "validation_loss": vali_loss,
+                    "test_loss": test_loss,
+                }
+            )
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            print(
+                f"Epoch: {epoch + 1}, Steps: {train_steps} | Train Loss: {train_loss:.7f} Vali Loss: {vali_loss:.7f} Test Loss: {test_loss:.7f}"
+            )
 
-            early_stopping(vali_loss, self.model, os.path.join(self.args.output_path, self.args.setting))
+            early_stopping(
+                vali_loss,
+                self.model,
+                os.path.join(self.args.output_path, self.args.setting),
+            )
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
 
             adjust_learning_rate(model_optim, epoch + 1, self.args)
 
-        best_model_path = self.args.output_path + '/' + self.args.setting + '/' + 'checkpoint.pth'
+        best_model_path = (
+            self.args.output_path + "/" + self.args.setting + "/" + "checkpoint.pth"
+        )
         self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
 
     def test(self, test=0):
         if test:
-            print('Loading model from checkpoint: ', self.args.checkpoints)
+            print("Loading model from checkpoint: ", self.args.checkpoints)
             self.model.load_state_dict(torch.load(self.args.checkpoints))
 
         preds = []
@@ -298,29 +335,37 @@ class Exp_Unimodal_Forecast(Exp_Basic):
 
         self.model.eval()
 
-        print('Start testing phase...')
-        test_data, test_loader = self._get_data(flag='test')
+        print("Start testing phase...")
+        test_data, test_loader = self._get_data(flag="test")
 
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(
+                test_loader
+            ):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len :, :]).float()
+                dec_inp = (
+                    torch.cat([batch_y[:, : self.args.label_len, :], dec_inp], dim=1)
+                    .float()
+                    .to(self.device)
+                )
 
                 # forward
                 if self.args.output_attention:
-                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[
+                        0
+                    ]
                 else:
                     outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                f_dim = -1 if self.args.features == "MS" else 0
+                outputs = outputs[:, -self.args.pred_len :, f_dim:]
+                batch_y = batch_y[:, -self.args.pred_len :, f_dim:].to(self.device)
 
                 pred = outputs.detach().cpu().numpy()
                 true = batch_y.detach().cpu().numpy()
@@ -334,38 +379,45 @@ class Exp_Unimodal_Forecast(Exp_Basic):
                         input = batch_x.detach().cpu().numpy()
                         if test_data.scale and self.args.inverse:
                             shape = input.shape
-                            input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
+                            input = test_data.inverse_transform(
+                                input.squeeze(0)
+                            ).reshape(shape)
                         gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                        visual(gt, pd, os.path.join(self.args.log_path, str(i) + '.pdf'))
+                        visual(
+                            gt, pd, os.path.join(self.args.log_path, str(i) + ".pdf")
+                        )
                     except Exception as e:
                         print(f"Visualization skipped due to error: {e}")
 
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
-        print('test shape:', preds.shape, trues.shape)
+        print("test shape:", preds.shape, trues.shape)
 
         # Calculate metrics
         mae, mse, rmse, mape, mspe = metric(preds, trues)
-        print('mse:{}, mae:{}, rmse:{}, mape:{}, mspe:{}'.format(mse, mae, rmse, mape, mspe))
+        print(f"mse:{mse}, mae:{mae}, rmse:{rmse}, mape:{mape}, mspe:{mspe}")
 
         # Save results
-        result_path = os.path.join(self.args.output_path, 'result.txt')
-        with open(result_path, 'a') as f:
+        result_path = os.path.join(self.args.output_path, "result.txt")
+        with open(result_path, "a") as f:
             f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ")
             f.write(self.args.setting + "  \n")
-            f.write('mse:{}, mae:{}, rmse:{}, mape:{}, mspe:{}'.format(mse, mae, rmse, mape, mspe))
-            f.write('\n\n')
+            f.write(f"mse:{mse}, mae:{mae}, rmse:{rmse}, mape:{mape}, mspe:{mspe}")
+            f.write("\n\n")
 
         # Save metrics and predictions
-        np.save(os.path.join(self.args.log_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe]))
-        np.save(os.path.join(self.args.log_path, 'pred.npy'), preds)
-        np.save(os.path.join(self.args.log_path, 'true.npy'), trues)
+        np.save(
+            os.path.join(self.args.log_path, "metrics.npy"),
+            np.array([mae, mse, rmse, mape, mspe]),
+        )
+        np.save(os.path.join(self.args.log_path, "pred.npy"), preds)
+        np.save(os.path.join(self.args.log_path, "true.npy"), trues)
 
         return mse
 
     def close_tracking(self):
         """Close tracking connections"""
-        if hasattr(self, 'writer'):
+        if hasattr(self, "writer"):
             self.writer.close()
             print("📊 TensorBoard writer closed")

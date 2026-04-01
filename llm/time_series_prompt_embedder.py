@@ -1,19 +1,19 @@
 import torch
 import torch.nn as nn
-from transformers import GPT2Tokenizer, GPT2Model
+from transformers import GPT2Model, GPT2Tokenizer
 
 
 class GenPromptEmb(nn.Module):
     def __init__(
-            self,
-            data_path='FRED',
-            model_name="gpt2",
-            device='cuda:0',
-            input_len=24,
-            d_model=768,
-            layer=12
+        self,
+        data_path="FRED",
+        model_name="gpt2",
+        device="cuda:0",
+        input_len=24,
+        d_model=768,
+        layer=12,
     ):
-        super(GenPromptEmb, self).__init__()
+        super().__init__()
         self.data_path = data_path
         self.device = device
         self.input_len = input_len
@@ -23,11 +23,18 @@ class GenPromptEmb(nn.Module):
         self.len = self.input_len - 1
         print(f"Using model: {self.model_name} on device: {self.device}")
 
-        if self.model_name.lower() == "gpt2" or self.model_name.lower() == "gpt2-medium" or self.model_name.lower() == "gpt2-large" or self.model_name.lower() == "gpt2-xl":
+        if (
+            self.model_name.lower() == "gpt2"
+            or self.model_name.lower() == "gpt2-medium"
+            or self.model_name.lower() == "gpt2-large"
+            or self.model_name.lower() == "gpt2-xl"
+        ):
             self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
             self.model = GPT2Model.from_pretrained(model_name).to(self.device)
         else:
-            raise ValueError(f"Unsupported model name: {self.model_name}. Only 'gpt2' is supported.")
+            raise ValueError(
+                f"Unsupported model name: {self.model_name}. Only 'gpt2' is supported."
+            )
         # print the GPT model
         print("Model Architecture:")
         print(self.model)  # Assuming the GPT model is stored as 'model' attribute
@@ -36,7 +43,9 @@ class GenPromptEmb(nn.Module):
         total_params = sum(p.numel() for p in self.model.parameters())
         print(f"Total parameters: {total_params:,}")
 
-    def _prepare_prompt(self, input_template, in_data, in_data_mark, i, j, in_data_text=None):
+    def _prepare_prompt(
+        self, input_template, in_data, in_data_mark, i, j, in_data_text=None
+    ):
         # Time series value
         values = in_data[i, :, j].flatten().tolist()
         values_str = ", ".join([str(int(value)) for value in values])
@@ -46,15 +55,24 @@ class GenPromptEmb(nn.Module):
         trends_str = f"{trends.item():0f}"
 
         # Date
-        if self.data_path in ['Health', 'Environment', 'Energy'
-                              ]:  # weekly or daily data
+        if self.data_path in [
+            "Health",
+            "Environment",
+            "Energy",
+        ]:  # weekly or daily data
             start_date = f"{int(in_data_mark[i, 0, 2]):02d}/{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d}"
             end_date = f"{int(in_data_mark[i, self.len, 2]):02d}/{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d}"
-        elif self.data_path in ['Agriculture', 'Climate', 'Economy', 'Security', 'Traffic',
-                                'Social Good']:  # monthly data
+        elif self.data_path in [
+            "Agriculture",
+            "Climate",
+            "Economy",
+            "Security",
+            "Traffic",
+            "Social Good",
+        ]:  # monthly data
             start_date = f"{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d}"  # MM/YYYY
             end_date = f"{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d}"
-        elif self.data_path in ['ETTh1', 'ETTh2', 'ECL']:  # hourly data
+        elif self.data_path in ["ETTh1", "ETTh2", "ECL"]:  # hourly data
             start_date = f"{int(in_data_mark[i, 0, 2]):02d}/{int(in_data_mark[i, 0, 1]):02d}/{int(in_data_mark[i, 0, 0]):04d} {int(in_data_mark[i, 0, 4]):02d}:00"
             end_date = f"{int(in_data_mark[i, self.len, 2]):02d}/{int(in_data_mark[i, self.len, 1]):02d}/{int(in_data_mark[i, self.len, 0]):04d} {int(in_data_mark[i, self.len, 4]):02d}:00"
         else:  # ETTm1, ETTm2, Weather, Farm # 15 minutes or 10 minutes data
@@ -78,12 +96,16 @@ class GenPromptEmb(nn.Module):
         # print(in_prompt)
         # print("---")
 
-        tokenized_prompt = self.tokenizer.encode(in_prompt, return_tensors="pt", max_length=1024, truncation=True).to(self.device)
+        tokenized_prompt = self.tokenizer.encode(
+            in_prompt, return_tensors="pt", max_length=1024, truncation=True
+        ).to(self.device)
         return tokenized_prompt
 
     def forward(self, tokenized_prompt):
         with torch.no_grad():
-            prompt_embeddings = self.model(tokenized_prompt).last_hidden_state  # this idea is from TimeCMA
+            prompt_embeddings = self.model(
+                tokenized_prompt
+            ).last_hidden_state  # this idea is from TimeCMA
         return prompt_embeddings
 
     def generate_embeddings(self, in_data, in_data_mark, in_data_text=None):
@@ -101,19 +123,23 @@ class GenPromptEmb(nn.Module):
 
         # print(
         #     f"Using input template for {self.data_path}: {input_templates.get(self.data_path, input_templates['Health'])}")
-        input_template = input_templates.get(self.data_path, input_templates['Health'])
+        input_template = input_templates.get(self.data_path, input_templates["Health"])
 
         tokenized_prompts = []
         max_token_count = 0
         for i in range(len(in_data)):  # iterate over samples
             for j in range(in_data.shape[2]):  # iterate over features
-                tokenized_prompt = self._prepare_prompt(input_template, in_data, in_data_mark, i, j, in_data_text).to(
-                    self.device)
+                tokenized_prompt = self._prepare_prompt(
+                    input_template, in_data, in_data_mark, i, j, in_data_text
+                ).to(self.device)
                 max_token_count = max(max_token_count, tokenized_prompt.shape[1])
                 tokenized_prompts.append((i, tokenized_prompt.to(self.device), j))
 
-        in_prompt_emb = torch.zeros((len(in_data), max_token_count, self.d_model, in_data.shape[2]),
-                                    dtype=torch.float32, device=self.device)
+        in_prompt_emb = torch.zeros(
+            (len(in_data), max_token_count, self.d_model, in_data.shape[2]),
+            dtype=torch.float32,
+            device=self.device,
+        )
         print(f"Max token count for prompts: {max_token_count}")
         print(f"Total prompts to process: {len(tokenized_prompts)}")
 
@@ -123,12 +149,16 @@ class GenPromptEmb(nn.Module):
             if padding_length > 0:
                 last_token_embedding = prompt_embeddings[:, -1, :].unsqueeze(1)
                 padding = last_token_embedding.repeat(1, padding_length, 1)
-                prompt_embeddings_padded = torch.cat([prompt_embeddings, padding], dim=1)
+                prompt_embeddings_padded = torch.cat(
+                    [prompt_embeddings, padding], dim=1
+                )
             else:
                 prompt_embeddings_padded = prompt_embeddings
 
             in_prompt_emb[i, :max_token_count, :, j] = prompt_embeddings_padded
-            last_token_emb = in_prompt_emb[:, max_token_count - 1:max_token_count, :, :]
+            last_token_emb = in_prompt_emb[
+                :, max_token_count - 1 : max_token_count, :, :
+            ]
             last_token_emb = last_token_emb.squeeze()
 
         return last_token_emb

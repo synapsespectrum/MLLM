@@ -2,24 +2,35 @@
 
 # Configuration parameters
 feature="S"  # M: multivariate, S: univariate, MS: multivariate forecasting univariate
-llm_model="GPT2"
+llm_model="RoBERTa" # LLAMA2, LLAMA3, GPT2, BERT, GPT2M, GPT2L, GPT2XL, RoBERTa
 batch_size=1
 device="cuda"
 
 # Define datasets with their corresponding input lengths (multiple lengths per dataset)
 declare -A dataset_input_lens
-dataset_input_lens["Environment"]="84 24"
-dataset_input_lens["Energy"]="36 24"
-dataset_input_lens["Health"]="36 24"
-dataset_input_lens["Agriculture"]="8 24"
-dataset_input_lens["Climate"]="8 24"
-dataset_input_lens["Economy"]="8 24"
-dataset_input_lens["Security"]="8 24"
-dataset_input_lens["SocialGood"]="8 24"
-dataset_input_lens["Traffic"]="8 24"
+# dataset_input_lens["Environment"]="84 24"
+# dataset_input_lens["Energy"]="36 24"
+# dataset_input_lens["Health"]="36 24"
+# dataset_input_lens["Agriculture"]="8 24"
+# dataset_input_lens["Climate"]="8 24"
+# dataset_input_lens["Economy"]="8 24"
+# dataset_input_lens["Security"]="8 24"
+# dataset_input_lens["SocialGood"]="8 24"
+# dataset_input_lens["Traffic"]="8 24"
+
+# config all input 24
+dataset_input_lens["Agriculture"]="24"
+dataset_input_lens["Climate"]="24"
+dataset_input_lens["Economy"]="24"
+dataset_input_lens["Energy"]="24"
+dataset_input_lens["Environment"]="24"
+dataset_input_lens["Health"]="24"
+dataset_input_lens["Security"]="24"
+dataset_input_lens["SocialGood"]="24"
+dataset_input_lens["Traffic"]="24"
 
 # Create log directories if they don't exist
-mkdir -p ./log-emb/text_emb_logs/${llm_model}/
+mkdir -p ./logs/log-emb/text_emb_logs/${llm_model}/
 mkdir -p ./Embeddings/
 
 echo "Starting embedding generation for all datasets with multiple input lengths..."
@@ -60,7 +71,7 @@ for data_path in "${!dataset_input_lens[@]}"; do
         echo "Target: $target"
         echo "=================================================="
 
-        log_file="./log-emb/text_emb_logs/${llm_model}/${data_path}_len${input_len}.log"
+        log_file="./logs/log-emb/text_emb_logs/${llm_model}/${data_path}_len${input_len}.log"
 
         # Expected output path
         expected_output="./Embeddings/text/${llm_model}/$data_path/$input_len/"
@@ -168,7 +179,7 @@ for data_path in "${!dataset_input_lens[@]}"; do
 done
 
 echo ""
-echo "📝 All logs saved in: ./log-emb/text_emb_logs/${llm_model}/"
+echo "📝 All logs saved in: ./logs/log-emb/text_emb_logs/${llm_model}/"
 echo "💾 Base embeddings path: ./Embeddings/text/${llm_model}/"
 echo ""
 echo "🎉 Finished processing all datasets with their multiple input lengths!"
